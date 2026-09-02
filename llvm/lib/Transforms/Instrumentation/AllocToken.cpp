@@ -104,7 +104,8 @@ STATISTIC(NumAllocationsInstrumented, "Allocations instrumented");
 
 /// Returns the !alloc_token metadata if available.
 ///
-/// Expected format is: !{<type-name>, <contains-pointer>}
+/// Expected format is:
+/// !{<type-name>, <contains-pointer>[, <allocation-site>]}
 MDNode *getAllocTokenMetadata(const CallBase &CB) {
   MDNode *Ret = nullptr;
   if (auto *II = dyn_cast<IntrinsicInst>(&CB);
@@ -119,7 +120,8 @@ MDNode *getAllocTokenMetadata(const CallBase &CB) {
     if (!Ret)
       return nullptr;
   }
-  assert(Ret->getNumOperands() == 2 && "bad !alloc_token");
+  assert((Ret->getNumOperands() == 2 || Ret->getNumOperands() == 3) &&
+         "bad !alloc_token");
   assert(isa<MDString>(Ret->getOperand(0)));
   assert(isa<ConstantAsMetadata>(Ret->getOperand(1)));
   return Ret;
@@ -129,6 +131,12 @@ bool containsPointer(const MDNode *MD) {
   ConstantAsMetadata *C = cast<ConstantAsMetadata>(MD->getOperand(1));
   auto *CI = cast<ConstantInt>(C->getValue());
   return CI->getValue().getBoolValue();
+}
+
+StringRef allocationSite(const MDNode *MD) {
+  if (MD->getNumOperands() < 3)
+    return {};
+  return cast<MDString>(MD->getOperand(2))->getString();
 }
 
 class ModeBase {
@@ -230,6 +238,27 @@ public:
   }
 };
 
+/// Implementation for TokenMode::TypeSiteHashPointerSplit.
+class TypeSiteHashPointerSplitMode : public TypeHashMode {
+public:
+  using TypeHashMode::TypeHashMode;
+
+  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
+    if (MDNode *N = getAllocTokenMetadata(CB)) {
+      MDString *S = cast<MDString>(N->getOperand(0));
+      AllocTokenMetadata Metadata{S->getString(), containsPointer(N),
+                                  allocationSite(N)};
+      if (!Metadata.AllocationSite.empty())
+        if (auto Token =
+                getAllocToken(TokenMode::TypeSiteHashPointerSplit, Metadata,
+                              MaxTokens))
+          return *Token;
+    }
+    remarkNoMetadata(CB, ORE);
+    return ClFallbackToken;
+  }
+};
+
 // Apply opt overrides and module flags.
 static AllocTokenOptions resolveOptions(AllocTokenOptions Opts,
                                         const Module &M) {
@@ -278,6 +307,9 @@ public:
     case TokenMode::TypeHashPointerSplit:
       Mode.emplace<TypeHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
       break;
+    case TokenMode::TypeSiteHashPointerSplit:
+      Mode.emplace<TypeSiteHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
+      break;
     }
   }
 
@@ -321,7 +353,7 @@ private:
   DenseMap<std::pair<LibFunc, uint64_t>, FunctionCallee> TokenAllocFunctions;
   // Selected mode.
   std::variant<IncrementMode, RandomMode, TypeHashMode,
-               TypeHashPointerSplitMode>
+               TypeHashPointerSplitMode, TypeSiteHashPointerSplitMode>
       Mode;
 };
 

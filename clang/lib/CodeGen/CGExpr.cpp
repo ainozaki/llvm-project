@@ -1343,8 +1343,10 @@ void CodeGenFunction::EmitBoundsCheckImpl(const Expr *ArrayExpr,
             IndexInst);
 }
 
-llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, getContext());
+llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType,
+                                               SourceLocation Loc) {
+  auto ATMD =
+      infer_alloc::getAllocTokenMetadata(AllocType, Loc, getContext());
   if (!ATMD)
     return nullptr;
 
@@ -1352,22 +1354,32 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
   auto *TypeNameMD = MDB.createString(ATMD->TypeName);
   auto *ContainsPtrC = Builder.getInt1(ATMD->ContainsPointer);
   auto *ContainsPtrMD = MDB.createConstant(ContainsPtrC);
+  auto Mode = getLangOpts().AllocTokenMode.value_or(
+      llvm::DefaultAllocTokenMode);
+  if (Mode == llvm::AllocTokenMode::TypeSiteHashPointerSplit) {
+    auto *AllocationSiteMD = MDB.createString(ATMD->AllocationSite);
+    // Format: !{<type-name>, <contains-pointer>, <allocation-site>}
+    return llvm::MDNode::get(
+        CGM.getLLVMContext(),
+        {TypeNameMD, ContainsPtrMD, AllocationSiteMD});
+  }
 
-  // Format: !{<type-name>, <contains-pointer>}
+  // The existing modes retain the original metadata format.
   return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
 }
 
-void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {
+void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType,
+                                     SourceLocation Loc) {
   assert(SanOpts.has(SanitizerKind::AllocToken) &&
          "Only needed with -fsanitize=alloc-token");
   CB->setMetadata(llvm::LLVMContext::MD_alloc_token,
-                  buildAllocToken(AllocType));
+                  buildAllocToken(AllocType, Loc));
 }
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(const CallExpr *E) {
   QualType AllocType = infer_alloc::inferPossibleType(E, getContext(), CurCast);
   if (!AllocType.isNull())
-    return buildAllocToken(AllocType);
+    return buildAllocToken(AllocType, E->getExprLoc());
   return nullptr;
 }
 

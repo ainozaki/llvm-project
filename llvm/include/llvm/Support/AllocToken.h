@@ -35,6 +35,10 @@ enum class AllocTokenMode {
   /// reserved for types that contain pointers and the bottom half for types
   /// that do not contain pointers.
   TypeHashPointerSplit,
+
+  /// Token ID based on the allocated type name and allocation site hash,
+  /// with separate ID spaces for types with and without pointers.
+  TypeSiteHashPointerSplit,
 };
 
 /// The default allocation token mode.
@@ -53,6 +57,7 @@ LLVM_ABI StringRef getAllocTokenModeAsString(AllocTokenMode Mode);
 struct AllocTokenMetadata {
   SmallString<64> TypeName;
   bool ContainsPointer;
+  SmallString<128> AllocationSite;
 };
 
 /// Calculates stable allocation token ID. Returns std::nullopt for stateful

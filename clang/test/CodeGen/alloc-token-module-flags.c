@@ -1,5 +1,6 @@
 // RUN: %clang_cc1 -fsanitize=alloc-token -emit-llvm -o - %s | FileCheck %s --check-prefix=DEFAULT
 // RUN: %clang_cc1 -fsanitize=alloc-token -falloc-token-mode=increment -emit-llvm -o - %s | FileCheck %s --check-prefix=INCREMENT
+// RUN: %clang_cc1 -fsanitize=alloc-token -falloc-token-mode=typesitehashpointersplit -emit-llvm -o - %s | FileCheck %s --check-prefix=TYPESITEHASH
 // RUN: %clang_cc1 -fsanitize=alloc-token -falloc-token-max=100 -emit-llvm -o - %s | FileCheck %s --check-prefix=MAX
 // RUN: %clang_cc1 -fsanitize=alloc-token -fsanitize-alloc-token-fast-abi -emit-llvm -o - %s | FileCheck %s --check-prefix=FASTABI
 // RUN: %clang_cc1 -fsanitize=alloc-token -fsanitize-alloc-token-extended -emit-llvm -o - %s | FileCheck %s --check-prefix=EXTENDED
@@ -11,6 +12,8 @@
 
 // INCREMENT: !llvm.module.flags = !{{{.*}}![[FLAG:[0-9]+]]{{.*}}}
 // INCREMENT: ![[FLAG]] = !{i32 1, !"alloc-token-mode", !"increment"}
+
+// TYPESITEHASH: ![[FLAG:[0-9]+]] = !{i32 1, !"alloc-token-mode", !"typesitehashpointersplit"}
 
 // MAX: !llvm.module.flags = !{{{.*}}![[FLAG:[0-9]+]]{{.*}}}
 // MAX: ![[FLAG]] = !{i32 1, !"alloc-token-max", i64 100}

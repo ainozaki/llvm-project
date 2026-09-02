@@ -17327,7 +17327,8 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (AllocType.isNull())
       return Error(
           E, diag::note_constexpr_infer_alloc_token_type_inference_failed);
-    auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, Info.Ctx);
+    auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, E->getExprLoc(),
+                                                   Info.Ctx);
     if (!ATMD)
       return Error(E, diag::note_constexpr_infer_alloc_token_no_metadata);
     auto Mode =

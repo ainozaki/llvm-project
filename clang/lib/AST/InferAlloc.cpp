@@ -17,7 +17,9 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 using namespace infer_alloc;
@@ -186,7 +188,8 @@ QualType infer_alloc::inferPossibleType(const CallExpr *E,
 }
 
 std::optional<llvm::AllocTokenMetadata>
-infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
+infer_alloc::getAllocTokenMetadata(QualType T, SourceLocation Loc,
+                                   const ASTContext &Ctx) {
   llvm::AllocTokenMetadata ATMD;
 
   // Get unique type name.
@@ -203,6 +206,28 @@ infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
   ATMD.ContainsPointer = typeContainsPointer(T, VisitedRD, IncompleteType);
   if (!ATMD.ContainsPointer && IncompleteType)
     return std::nullopt;
+
+  // Use the presumed expansion location as the allocation site. This makes
+  // allocations in macros distinct by invocation rather than assigning every
+  // invocation to the macro definition. Add the spelling location for macros
+  // to distinguish multiple allocation expressions in one macro expansion.
+  const SourceManager &SM = Ctx.getSourceManager();
+  auto AppendLocation = [&](SourceLocation L) {
+    PresumedLoc PLoc = SM.getPresumedLoc(L);
+    if (PLoc.isInvalid())
+      return false;
+    llvm::SmallString<128> Filename(PLoc.getFilename());
+    Ctx.getLangOpts().remapPathPrefix(Filename);
+    llvm::raw_svector_ostream OS(ATMD.AllocationSite);
+    OS << Filename << ':' << PLoc.getLine() << ':' << PLoc.getColumn();
+    return true;
+  };
+
+  if (AppendLocation(Loc) && Loc.isMacroID()) {
+    ATMD.AllocationSite.push_back('@');
+    if (!AppendLocation(SM.getSpellingLoc(Loc)))
+      ATMD.AllocationSite.pop_back();
+  }
 
   return ATMD;
 }

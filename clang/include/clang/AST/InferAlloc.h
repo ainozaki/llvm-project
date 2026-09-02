@@ -27,7 +27,7 @@ QualType inferPossibleType(const CallExpr *E, const ASTContext &Ctx,
 
 /// Get the information required for construction of an allocation token ID.
 std::optional<llvm::AllocTokenMetadata>
-getAllocTokenMetadata(QualType T, const ASTContext &Ctx);
+getAllocTokenMetadata(QualType T, SourceLocation Loc, const ASTContext &Ctx);
 
 } // namespace infer_alloc
 } // namespace clang

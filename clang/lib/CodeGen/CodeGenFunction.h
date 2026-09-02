@@ -3424,9 +3424,10 @@ public:
                              SanitizerHandler Handler);
 
   /// Build metadata used by the AllocToken instrumentation.
-  llvm::MDNode *buildAllocToken(QualType AllocType);
+  llvm::MDNode *buildAllocToken(QualType AllocType, SourceLocation Loc);
   /// Emit and set additional metadata used by the AllocToken instrumentation.
-  void EmitAllocToken(llvm::CallBase *CB, QualType AllocType);
+  void EmitAllocToken(llvm::CallBase *CB, QualType AllocType,
+                      SourceLocation Loc);
   /// Build additional metadata used by the AllocToken instrumentation,
   /// inferring the type from an allocation call expression.
   llvm::MDNode *buildAllocToken(const CallExpr *E);
