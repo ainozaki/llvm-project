@@ -209,24 +209,14 @@ infer_alloc::getAllocTokenMetadata(QualType T, SourceLocation Loc,
 
   // Use the presumed expansion location as the allocation site. This makes
   // allocations in macros distinct by invocation rather than assigning every
-  // invocation to the macro definition. Add the spelling location for macros
-  // to distinguish multiple allocation expressions in one macro expansion.
+  // invocation to the macro definition.
   const SourceManager &SM = Ctx.getSourceManager();
-  auto AppendLocation = [&](SourceLocation L) {
-    PresumedLoc PLoc = SM.getPresumedLoc(L);
-    if (PLoc.isInvalid())
-      return false;
+  PresumedLoc PLoc = SM.getPresumedLoc(Loc);
+  if (PLoc.isValid()) {
     llvm::SmallString<128> Filename(PLoc.getFilename());
     Ctx.getLangOpts().remapPathPrefix(Filename);
     llvm::raw_svector_ostream OS(ATMD.AllocationSite);
     OS << Filename << ':' << PLoc.getLine() << ':' << PLoc.getColumn();
-    return true;
-  };
-
-  if (AppendLocation(Loc) && Loc.isMacroID()) {
-    ATMD.AllocationSite.push_back('@');
-    if (!AppendLocation(SM.getSpellingLoc(Loc)))
-      ATMD.AllocationSite.pop_back();
   }
 
   return ATMD;

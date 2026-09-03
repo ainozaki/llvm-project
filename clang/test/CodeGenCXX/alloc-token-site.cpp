@@ -33,7 +33,7 @@ int *from_new() {
 
 // CHECK-DAG: [[FIRST]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:101:29"}
 // CHECK-DAG: [[SECOND]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:105:29"}
-// CHECK-DAG: [[MACRO]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:110:10@alloc-token-site-input.cpp:108:40"}
+// CHECK-DAG: [[MACRO]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:110:10"}
 // CHECK-DAG: [[NEW]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:114:10"}
 
 // REMAP: !{!"int", i1 false, !"remapped.cpp:101:29"}
