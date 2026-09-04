@@ -188,7 +188,7 @@ QualType infer_alloc::inferPossibleType(const CallExpr *E,
 }
 
 std::optional<llvm::AllocTokenMetadata>
-infer_alloc::getAllocTokenMetadata(QualType T, SourceLocation Loc,
+infer_alloc::getAllocTokenMetadata(QualType T, const Decl *ContextDecl,
                                    const ASTContext &Ctx) {
   llvm::AllocTokenMetadata ATMD;
 
@@ -207,16 +207,23 @@ infer_alloc::getAllocTokenMetadata(QualType T, SourceLocation Loc,
   if (!ATMD.ContainsPointer && IncompleteType)
     return std::nullopt;
 
-  // Use the presumed expansion location as the allocation site. This makes
-  // allocations in macros distinct by invocation rather than assigning every
-  // invocation to the macro definition.
+  // Use the enclosing declaration's remapped filename and the unqualified
+  // function name as the allocation site. This keeps token IDs stable when
+  // code moves within a function.
+  if (!ContextDecl)
+    return ATMD;
+
   const SourceManager &SM = Ctx.getSourceManager();
-  PresumedLoc PLoc = SM.getPresumedLoc(Loc);
+  PresumedLoc PLoc = SM.getPresumedLoc(ContextDecl->getLocation());
   if (PLoc.isValid()) {
     llvm::SmallString<128> Filename(PLoc.getFilename());
     Ctx.getLangOpts().remapPathPrefix(Filename);
     llvm::raw_svector_ostream OS(ATMD.AllocationSite);
-    OS << Filename << ':' << PLoc.getLine() << ':' << PLoc.getColumn();
+    OS << Filename << ':';
+    if (const auto *FD = dyn_cast<FunctionDecl>(ContextDecl))
+      FD->printName(OS);
+    else
+      OS << "<global>";
   }
 
   return ATMD;

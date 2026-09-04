@@ -5,9 +5,11 @@ using size_t = decltype(sizeof(0));
 extern "C" void *malloc(size_t) __attribute__((malloc, alloc_size(1)));
 
 #line 100 "alloc-token-site-input.cpp"
+namespace ns {
 int *first() {
   return static_cast<int *>(malloc(sizeof(int)));
 }
+} // namespace ns
 
 int *second() {
   return static_cast<int *>(malloc(sizeof(int)));
@@ -22,7 +24,7 @@ int *from_new() {
   return new int;
 }
 
-// CHECK-LABEL: define{{.*}} ptr @_Z5firstv()
+// CHECK-LABEL: define{{.*}} ptr @_ZN2ns5firstEv()
 // CHECK: call{{.*}} @malloc{{.*}} !alloc_token [[FIRST:![0-9]+]]
 // CHECK-LABEL: define{{.*}} ptr @_Z6secondv()
 // CHECK: call{{.*}} @malloc{{.*}} !alloc_token [[SECOND:![0-9]+]]
@@ -31,9 +33,9 @@ int *from_new() {
 // CHECK-LABEL: define{{.*}} ptr @_Z8from_newv()
 // CHECK: call{{.*}} @_Znwm{{.*}} !alloc_token [[NEW:![0-9]+]]
 
-// CHECK-DAG: [[FIRST]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:101:29"}
-// CHECK-DAG: [[SECOND]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:105:29"}
-// CHECK-DAG: [[MACRO]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:110:10"}
-// CHECK-DAG: [[NEW]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:114:10"}
+// CHECK-DAG: [[FIRST]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:first"}
+// CHECK-DAG: [[SECOND]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:second"}
+// CHECK-DAG: [[MACRO]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:from_macro"}
+// CHECK-DAG: [[NEW]] = !{!"int", i1 false, !"alloc-token-site-input.cpp:from_new"}
 
-// REMAP: !{!"int", i1 false, !"remapped.cpp:101:29"}
+// REMAP: !{!"int", i1 false, !"remapped.cpp:first"}

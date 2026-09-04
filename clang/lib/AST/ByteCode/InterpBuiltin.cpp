@@ -1546,8 +1546,11 @@ static bool interp__builtin_infer_alloc_token(InterpState &S, CodePtr OpPC,
     return false;
   }
 
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType,
-                                                 Call->getExprLoc(), ASTCtx);
+  const Decl *ContextDecl = Frame ? Frame->getCallee() : nullptr;
+  if (!ContextDecl)
+    ContextDecl = S.EvaluatingDecl;
+  auto ATMD =
+      infer_alloc::getAllocTokenMetadata(AllocType, ContextDecl, ASTCtx);
   if (!ATMD) {
     S.CCEDiag(Call, diag::note_constexpr_infer_alloc_token_no_metadata);
     return false;

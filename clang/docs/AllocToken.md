@@ -38,8 +38,8 @@ change or removal. These may (experimentally) be selected with `-Xclang
 - `typehash`: This mode assigns a token ID based on the hash of the allocated
   type's name.
 - `typesitehashpointersplit`: This mode assigns a token ID based on the hash of
-  the allocated type's name and source allocation site. Allocation sites are
-  represented by their remapped source file, line, and column.
+  the allocated type's name and enclosing function. Allocation sites are
+  represented by their remapped source file and unqualified function name.
 - `random`: This mode assigns a statically-determined random token ID to each
   allocation site.
 - `increment`: This mode assigns a simple, incrementally increasing token ID

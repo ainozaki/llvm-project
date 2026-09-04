@@ -1683,7 +1683,7 @@ llvm::Value *CodeGenFunction::EmitCXXNewExpr(const CXXNewExpr *E) {
       }
       if (SanOpts.has(SanitizerKind::AllocToken)) {
         // Set !alloc_token metadata.
-        EmitAllocToken(newCall, allocType, E->getExprLoc());
+        EmitAllocToken(newCall, allocType);
       }
     }
 

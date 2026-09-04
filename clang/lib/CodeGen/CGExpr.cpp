@@ -1343,10 +1343,9 @@ void CodeGenFunction::EmitBoundsCheckImpl(const Expr *ArrayExpr,
             IndexInst);
 }
 
-llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType,
-                                               SourceLocation Loc) {
-  auto ATMD =
-      infer_alloc::getAllocTokenMetadata(AllocType, Loc, getContext());
+llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
+  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, CurFuncDecl,
+                                                 getContext());
   if (!ATMD)
     return nullptr;
 
@@ -1368,18 +1367,17 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType,
   return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
 }
 
-void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType,
-                                     SourceLocation Loc) {
+void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {
   assert(SanOpts.has(SanitizerKind::AllocToken) &&
          "Only needed with -fsanitize=alloc-token");
   CB->setMetadata(llvm::LLVMContext::MD_alloc_token,
-                  buildAllocToken(AllocType, Loc));
+                  buildAllocToken(AllocType));
 }
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(const CallExpr *E) {
   QualType AllocType = infer_alloc::inferPossibleType(E, getContext(), CurCast);
   if (!AllocType.isNull())
-    return buildAllocToken(AllocType, E->getExprLoc());
+    return buildAllocToken(AllocType);
   return nullptr;
 }
 
