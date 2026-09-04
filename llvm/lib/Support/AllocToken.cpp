@@ -25,7 +25,8 @@ llvm::getAllocTokenModeFromString(StringRef Name) {
       .Case("typehash", AllocTokenMode::TypeHash)
       .Case("typehashpointersplit", AllocTokenMode::TypeHashPointerSplit)
       .Case("typefunchash", AllocTokenMode::TypeFuncHash)
-      .Case("typefunchashpointersplit", AllocTokenMode::TypeFuncHashPointerSplit)
+      .Case("typefunchashpointersplit",
+            AllocTokenMode::TypeFuncHashPointerSplit)
       .Case("default", DefaultAllocTokenMode)
       .Default(std::nullopt);
 }
@@ -55,10 +56,11 @@ static uint64_t getStableHash(const AllocTokenMetadata &Metadata,
 
 static uint64_t getStableFuncTypeHash(const AllocTokenMetadata &Metadata,
                                       uint64_t MaxTokens) {
+  assert(Metadata.FuncName && "Missing function name");
   SmallString<128> Buffer;
   Buffer.append(Metadata.TypeName);
   Buffer.push_back(':');
-  Buffer.append(Metadata.FuncName);
+  Buffer.append(*Metadata.FuncName);
   return getStableSipHash(Buffer) % MaxTokens;
 }
 
@@ -87,9 +89,13 @@ std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
   }
 
   case AllocTokenMode::TypeFuncHash:
+    if (!Metadata.FuncName)
+      return std::nullopt;
     return getStableFuncTypeHash(Metadata, MaxTokens);
 
   case AllocTokenMode::TypeFuncHashPointerSplit: {
+    if (!Metadata.FuncName)
+      return std::nullopt;
     if (MaxTokens == 1)
       return 0;
     const uint64_t HalfTokens = MaxTokens / 2;

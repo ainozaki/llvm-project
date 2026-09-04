@@ -1354,11 +1354,12 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
   auto *ContainsPtrC = Builder.getInt1(ATMD->ContainsPointer);
   auto *ContainsPtrMD = MDB.createConstant(ContainsPtrC);
 
-  auto Mode = getLangOpts().AllocTokenMode.value_or(
-      llvm::DefaultAllocTokenMode);
+  auto Mode =
+      getLangOpts().AllocTokenMode.value_or(llvm::DefaultAllocTokenMode);
   if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
       Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit) {
-    auto *FuncNameMD = MDB.createString(ATMD->FuncName);
+    assert(ATMD->FuncName && "missing function name");
+    auto *FuncNameMD = MDB.createString(*ATMD->FuncName);
     // Format: !{<type-name>, <contains-pointer>, <func-name>}
     return llvm::MDNode::get(CGM.getLLVMContext(),
                              {TypeNameMD, ContainsPtrMD, FuncNameMD});

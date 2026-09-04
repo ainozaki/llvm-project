@@ -17332,7 +17332,6 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (!FD && Info.EvaluatingDecl.is<const ValueDecl *>())
       FD = dyn_cast_or_null<FunctionDecl>(
           Info.EvaluatingDecl.get<const ValueDecl *>());
-
     auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, Info.Ctx, FD);
     if (!ATMD)
       return Error(E, diag::note_constexpr_infer_alloc_token_no_metadata);

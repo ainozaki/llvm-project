@@ -205,10 +205,10 @@ infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx,
   if (!ATMD.ContainsPointer && IncompleteType)
     return std::nullopt;
 
+  ATMD.FuncName.emplace();
   if (FD) {
-    llvm::raw_svector_ostream FuncNameOS(ATMD.FuncName);
+    llvm::raw_svector_ostream FuncNameOS(*ATMD.FuncName);
     FD->printQualifiedName(FuncNameOS);
   }
-
   return ATMD;
 }

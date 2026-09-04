@@ -33,13 +33,27 @@ entry:
   ret void
 }
 
+define void @missingFuncName() sanitize_alloc_token {
+; CHECK-LABEL: define void @missingFuncName(
+; CHECK-SAME: ) #[[ATTR1]] {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[TMP0:%.*]] = call ptr @__alloc_token_malloc(i64 4, i64 0), !alloc_token [[META4:![0-9]+]]
+; CHECK-NEXT:    ret void
+;
+entry:
+  call ptr @malloc(i64 4), !alloc_token !4
+  ret void
+}
+
 !0 = !{!"int", i1 0, !"funcA"}
 !1 = !{!"int*", i1 1, !"funcA"}
 !2 = !{!"int", i1 0, !"funcB"}
 !3 = !{!"int*", i1 1, !"funcB"}
+!4 = !{!"int", i1 0}
 ;.
 ; CHECK: [[META0]] = !{!"int", i1 false, !"funcA"}
 ; CHECK: [[META1]] = !{!"int*", i1 true, !"funcA"}
 ; CHECK: [[META2]] = !{!"int", i1 false, !"funcB"}
 ; CHECK: [[META3]] = !{!"int*", i1 true, !"funcB"}
+; CHECK: [[META4]] = !{!"int", i1 false}
 ;.

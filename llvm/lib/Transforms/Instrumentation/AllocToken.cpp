@@ -102,10 +102,16 @@ STATISTIC(NumAllocationsInstrumented, "Allocations instrumented");
 
 //===----------------------------------------------------------------------===//
 
-/// Returns the !alloc_token metadata if available.
+bool containsPointer(const MDNode *MD) {
+  ConstantAsMetadata *C = cast<ConstantAsMetadata>(MD->getOperand(1));
+  auto *CI = cast<ConstantInt>(C->getValue());
+  return CI->getValue().getBoolValue();
+}
+
+/// Returns the allocation token metadata if available.
 ///
 /// Expected format is: !{<type-name>, <contains-pointer>[, <func-name>]}
-MDNode *getAllocTokenMetadata(const CallBase &CB) {
+std::optional<AllocTokenMetadata> getAllocTokenMetadata(const CallBase &CB) {
   MDNode *Ret = nullptr;
   if (auto *II = dyn_cast<IntrinsicInst>(&CB);
       II && II->getIntrinsicID() == Intrinsic::alloc_token_id) {
@@ -113,11 +119,11 @@ MDNode *getAllocTokenMetadata(const CallBase &CB) {
     Ret = cast<MDNode>(MDV->getMetadata());
     // If the intrinsic has an empty MDNode, type inference failed.
     if (Ret->getNumOperands() == 0)
-      return nullptr;
+      return std::nullopt;
   } else {
     Ret = CB.getMetadata(LLVMContext::MD_alloc_token);
     if (!Ret)
-      return nullptr;
+      return std::nullopt;
   }
   assert((Ret->getNumOperands() == 2 || Ret->getNumOperands() == 3) &&
          "bad !alloc_token");
@@ -125,22 +131,12 @@ MDNode *getAllocTokenMetadata(const CallBase &CB) {
   assert(isa<ConstantAsMetadata>(Ret->getOperand(1)));
   if (Ret->getNumOperands() >= 3)
     assert(isa<MDString>(Ret->getOperand(2)));
-  return Ret;
-}
 
-bool containsPointer(const MDNode *MD) {
-  ConstantAsMetadata *C = cast<ConstantAsMetadata>(MD->getOperand(1));
-  auto *CI = cast<ConstantInt>(C->getValue());
-  return CI->getValue().getBoolValue();
-}
-
-AllocTokenMetadata extractMetadata(const CallBase &CB, const MDNode *N) {
-  MDString *S = cast<MDString>(N->getOperand(0));
-  StringRef FuncName =
-      (N->getNumOperands() >= 3)
-          ? cast<MDString>(N->getOperand(2))->getString()
-          : (CB.getFunction() ? CB.getFunction()->getName() : "");
-  return AllocTokenMetadata{S->getString(), containsPointer(N), FuncName};
+  MDString *S = cast<MDString>(Ret->getOperand(0));
+  std::optional<SmallString<64>> FuncName;
+  if (Ret->getNumOperands() >= 3)
+    FuncName.emplace(cast<MDString>(Ret->getOperand(2))->getString());
+  return AllocTokenMetadata{S->getString(), containsPointer(Ret), FuncName};
 }
 
 class ModeBase {
@@ -195,9 +191,8 @@ public:
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
 
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      AllocTokenMetadata Metadata = extractMetadata(CB, N);
-      if (auto Token = getAllocToken(TokenMode::TypeHash, Metadata, MaxTokens))
+    if (auto Metadata = getAllocTokenMetadata(CB)) {
+      if (auto Token = getAllocToken(TokenMode::TypeHash, *Metadata, MaxTokens))
         return *Token;
     }
     // Fallback.
@@ -226,9 +221,8 @@ public:
   using TypeHashMode::TypeHashMode;
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      AllocTokenMetadata Metadata = extractMetadata(CB, N);
-      if (auto Token = getAllocToken(TokenMode::TypeHashPointerSplit, Metadata,
+    if (auto Metadata = getAllocTokenMetadata(CB)) {
+      if (auto Token = getAllocToken(TokenMode::TypeHashPointerSplit, *Metadata,
                                      MaxTokens))
         return *Token;
     }
@@ -246,10 +240,9 @@ public:
   using TypeHashMode::TypeHashMode;
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      AllocTokenMetadata Metadata = extractMetadata(CB, N);
+    if (auto Metadata = getAllocTokenMetadata(CB)) {
       if (auto Token =
-              getAllocToken(TokenMode::TypeFuncHash, Metadata, MaxTokens))
+              getAllocToken(TokenMode::TypeFuncHash, *Metadata, MaxTokens))
         return *Token;
     }
     remarkNoMetadata(CB, ORE);
@@ -263,10 +256,9 @@ public:
   using TypeHashMode::TypeHashMode;
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      AllocTokenMetadata Metadata = extractMetadata(CB, N);
+    if (auto Metadata = getAllocTokenMetadata(CB)) {
       if (auto Token = getAllocToken(TokenMode::TypeFuncHashPointerSplit,
-                                     Metadata, MaxTokens))
+                                     *Metadata, MaxTokens))
         return *Token;
     }
     remarkNoMetadata(CB, ORE);
