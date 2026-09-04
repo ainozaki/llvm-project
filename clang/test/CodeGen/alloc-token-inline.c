@@ -24,4 +24,4 @@ void test_inlined_wrapper(void) {
 }
 
 // CHECK: declare{{.*}} @__alloc_token_malloc(
-// CHECK: [[META_INT]] = !{!"int", i1 false, !"test_inlined_wrapper"}
+// CHECK: [[META_INT]] = !{!"int", i1 false}

@@ -1353,11 +1353,19 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
   auto *TypeNameMD = MDB.createString(ATMD->TypeName);
   auto *ContainsPtrC = Builder.getInt1(ATMD->ContainsPointer);
   auto *ContainsPtrMD = MDB.createConstant(ContainsPtrC);
-  auto *FuncNameMD = MDB.createString(ATMD->FuncName);
 
-  // Format: !{<type-name>, <contains-pointer>, <func-name>}
-  return llvm::MDNode::get(CGM.getLLVMContext(),
-                           {TypeNameMD, ContainsPtrMD, FuncNameMD});
+  auto Mode = getLangOpts().AllocTokenMode.value_or(
+      llvm::DefaultAllocTokenMode);
+  if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
+      Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit) {
+    auto *FuncNameMD = MDB.createString(ATMD->FuncName);
+    // Format: !{<type-name>, <contains-pointer>, <func-name>}
+    return llvm::MDNode::get(CGM.getLLVMContext(),
+                             {TypeNameMD, ContainsPtrMD, FuncNameMD});
+  }
+
+  // Format: !{<type-name>, <contains-pointer>}
+  return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
 }
 
 void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {

@@ -47,7 +47,7 @@ unsigned long test_builtin_struct_w_ptr() {
 
 // CHECK-LABEL: @_Z24test_builtin_unevaluatedv(
 // CHECK-NOT: call{{.*}}unevaluated_fn
-// CHECK-CODEGEN: call i64 @llvm.alloc.token.id.i64(metadata ![[META_INT_UNEV:[0-9]+]])
+// CHECK-CODEGEN: call i64 @llvm.alloc.token.id.i64(metadata ![[META_INT:[0-9]+]])
 // CHECK-LOWER: ret i64 0
 unsigned long test_builtin_unevaluated() {
 	return __builtin_infer_alloc_token(sizeof(int) * unevaluated_fn());
@@ -77,24 +77,21 @@ constexpr unsigned long get_token() {
 }
 
 // CHECK-LABEL: @_Z13get_token_intv()
-// CHECK-CODEGEN: call i64 @llvm.alloc.token.id.i64(metadata ![[META_GET_TOKEN_INT:[0-9]+]])
+// CHECK-CODEGEN: call i64 @llvm.alloc.token.id.i64(metadata ![[META_INT]])
 // CHECK-LOWER: ret i64 0
 unsigned long get_token_int() {
   return get_token<int>();
 }
 
 // CHECK-LABEL: @_Z13get_token_ptrv()
-// CHECK-CODEGEN: call i64 @llvm.alloc.token.id.i64(metadata ![[META_GET_TOKEN_PTR:[0-9]+]])
+// CHECK-CODEGEN: call i64 @llvm.alloc.token.id.i64(metadata ![[META_PTR]])
 // CHECK-LOWER: ret i64 1
 unsigned long get_token_ptr() {
   return get_token<int *>();
 }
 
-// CHECK-CODEGEN: ![[META_INT]] = !{!"int", i1 false, !"test_builtin_int"}
-// CHECK-CODEGEN: ![[META_PTR]] = !{!"int *", i1 true, !"test_builtin_ptr"}
-// CHECK-CODEGEN: ![[META_NOPTR]] = !{!"NoPtr", i1 false, !"test_builtin_struct_noptr"}
-// CHECK-CODEGEN: ![[META_WITHPTR]] = !{!"WithPtr", i1 true, !"test_builtin_struct_w_ptr"}
-// CHECK-CODEGEN: ![[META_INT_UNEV]] = !{!"int", i1 false, !"test_builtin_unevaluated"}
+// CHECK-CODEGEN: ![[META_INT]] = !{!"int", i1 false}
+// CHECK-CODEGEN: ![[META_PTR]] = !{!"int *", i1 true}
+// CHECK-CODEGEN: ![[META_NOPTR]] = !{!"NoPtr", i1 false}
+// CHECK-CODEGEN: ![[META_WITHPTR]] = !{!"WithPtr", i1 true}
 // CHECK-CODEGEN: ![[META_UNKNOWN]] = !{}
-// CHECK-CODEGEN: ![[META_GET_TOKEN_INT]] = !{!"int", i1 false, !"get_token"}
-// CHECK-CODEGEN: ![[META_GET_TOKEN_PTR]] = !{!"int *", i1 true, !"get_token"}

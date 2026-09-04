@@ -36,5 +36,5 @@ void test_malloc_like() {
   posix_memalign(&sink, 64, sizeof(int)); // FIXME: support posix_memalign
 }
 
-// CHECK: [[META_INT]] = !{!"int", i1 false, !"test_malloc_like"}
-// CHECK: [[META_LONG]] = !{!"long", i1 false, !"test_malloc_like"}
+// CHECK: [[META_INT]] = !{!"int", i1 false}
+// CHECK: [[META_LONG]] = !{!"long", i1 false}

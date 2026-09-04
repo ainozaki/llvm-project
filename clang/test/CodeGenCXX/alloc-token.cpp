@@ -50,9 +50,9 @@ void test_malloc_like() {
 class ForwardDecl;
 
 // CHECK-LABEL: define dso_local void @_Z21test_malloc_like_castv(
-// CHECK: call noalias ptr @malloc(i64 noundef 64){{.*}} !alloc_token [[META_INT_CAST:![0-9]+]]
-// CHECK: call noalias ptr @malloc(i64 noundef 64){{.*}} !alloc_token [[META_INT_CAST]]
-// CHECK-NOT: call noalias ptr @malloc(i64 noundef 64){{.*}} !alloc_token
+// CHECK: call noalias ptr @malloc(i64 noundef 64){{.*}} !alloc_token [[META_INT]]
+// CHECK: call noalias ptr @malloc(i64 noundef 64){{.*}} !alloc_token [[META_INT]]
+// CHECK-NOT: call noalias ptr @malloc(i64 noundef 64){{.*}} !alloc_token [[META_INT]]
 void test_malloc_like_cast() {
   sink = (int *)malloc(64);
   sink = reinterpret_cast<int *>(malloc(64));
@@ -61,50 +61,50 @@ void test_malloc_like_cast() {
 }
 
 // CHECK-LABEL: define dso_local void @_Z17test_operator_newv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT_OP_NEW:![0-9]+]]
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT_OP_NEW]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT]]
 void test_operator_new() {
   sink = __builtin_operator_new(sizeof(int));
   sink = ::operator new(sizeof(int));
 }
 
 // CHECK-LABEL: define dso_local void @_Z25test_operator_new_nothrowv(
-// CHECK: call noalias noundef ptr @_ZnwmRKSt9nothrow_t(i64 noundef 4, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT_OP_NEW_NOTHROW:![0-9]+]]
-// CHECK: call noalias noundef ptr @_ZnwmRKSt9nothrow_t(i64 noundef 4, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT_OP_NEW_NOTHROW]]
+// CHECK: call noalias noundef ptr @_ZnwmRKSt9nothrow_t(i64 noundef 4, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT]]
+// CHECK: call noalias noundef ptr @_ZnwmRKSt9nothrow_t(i64 noundef 4, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT]]
 void test_operator_new_nothrow() {
   sink = __builtin_operator_new(sizeof(int), std::nothrow);
   sink = ::operator new(sizeof(int), std::nothrow);
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z8test_newv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT_NEW:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT]]
 int *test_new() {
   return new int;
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z14test_new_arrayv(
-// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 40){{.*}} !alloc_token [[META_INT_NEW_ARR:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 40){{.*}} !alloc_token [[META_INT]]
 int *test_new_array() {
   return new int[10];
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z16test_new_nothrowv(
-// CHECK: call noalias noundef ptr @_ZnwmRKSt9nothrow_t(i64 noundef 4, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT_NEW_NOTHROW:![0-9]+]]
+// CHECK: call noalias noundef ptr @_ZnwmRKSt9nothrow_t(i64 noundef 4, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT]]
 int *test_new_nothrow() {
   return new (std::nothrow) int;
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z22test_new_array_nothrowv(
-// CHECK: call noalias noundef ptr @_ZnamRKSt9nothrow_t(i64 noundef 40, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT_NEW_ARR_NOTHROW:![0-9]+]]
+// CHECK: call noalias noundef ptr @_ZnamRKSt9nothrow_t(i64 noundef 40, ptr noundef nonnull align 1 dereferenceable(1) @_ZSt7nothrow){{.*}} !alloc_token [[META_INT]]
 int *test_new_array_nothrow() {
   return new (std::nothrow) int[10];
 }
 
 // CHECK-LABEL: define dso_local void @_Z23test_size_returning_newv(
-// CHECK: call { ptr, i64 } @__size_returning_new(i64 noundef 8){{.*}} !alloc_token [[META_LONG_SIZE_RET_NEW:![0-9]+]]
-// CHECK: call { ptr, i64 } @__size_returning_new_hot_cold(i64 noundef 8, i8 noundef zeroext 1){{.*}} !alloc_token [[META_LONG_SIZE_RET_NEW]]
-// CHECK: call { ptr, i64 } @__size_returning_new_aligned(i64 noundef 8, i64 noundef 32){{.*}} !alloc_token [[META_LONG_SIZE_RET_NEW]]
-// CHECK: call { ptr, i64 } @__size_returning_new_aligned_hot_cold(i64 noundef 8, i64 noundef 32, i8 noundef zeroext 1){{.*}}_token [[META_LONG_SIZE_RET_NEW]]
+// CHECK: call { ptr, i64 } @__size_returning_new(i64 noundef 8){{.*}} !alloc_token [[META_LONG]]
+// CHECK: call { ptr, i64 } @__size_returning_new_hot_cold(i64 noundef 8, i8 noundef zeroext 1){{.*}} !alloc_token [[META_LONG]]
+// CHECK: call { ptr, i64 } @__size_returning_new_aligned(i64 noundef 8, i64 noundef 32){{.*}} !alloc_token [[META_LONG]]
+// CHECK: call { ptr, i64 } @__size_returning_new_aligned_hot_cold(i64 noundef 8, i64 noundef 32, i8 noundef zeroext 1){{.*}}_token [[META_LONG]]
 void test_size_returning_new() {
   sink = __size_returning_new(sizeof(long)).p;
   sink = __size_returning_new_hot_cold(sizeof(long), __hot_cold_t{1}).p;
@@ -123,7 +123,7 @@ void may_throw();
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z27test_exception_handling_newv(
 // CHECK: invoke noalias noundef nonnull ptr @_Znwm(i64 noundef 72)
-// CHECK-NEXT: !alloc_token [[META_TESTCLASS_EXC:![0-9]+]]
+// CHECK-NEXT: !alloc_token [[META_TESTCLASS:![0-9]+]]
 TestClass *test_exception_handling_new() {
   try {
     TestClass *obj = new TestClass();
@@ -135,7 +135,7 @@ TestClass *test_exception_handling_new() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z14test_new_classv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 72){{.*}} !alloc_token [[META_TESTCLASS_NEW:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 72){{.*}} !alloc_token [[META_TESTCLASS]]
 TestClass *test_new_class() {
   TestClass *obj = new TestClass();
   obj->data[0] = 42;
@@ -143,23 +143,13 @@ TestClass *test_new_class() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z20test_new_class_arrayv(
-// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 728){{.*}} !alloc_token [[META_TESTCLASS_NEW_ARR:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 728){{.*}} !alloc_token [[META_TESTCLASS]]
 TestClass *test_new_class_array() {
   TestClass* arr = new TestClass[10];
   arr[0].data[0] = 123;
   return arr;
 }
 
-// CHECK: [[META_INT]] = !{!"int", i1 false, !"test_malloc_like"}
-// CHECK: [[META_LONG]] = !{!"long", i1 false, !"test_malloc_like"}
-// CHECK: [[META_INT_CAST]] = !{!"int", i1 false, !"test_malloc_like_cast"}
-// CHECK: [[META_INT_OP_NEW]] = !{!"int", i1 false, !"test_operator_new"}
-// CHECK: [[META_INT_OP_NEW_NOTHROW]] = !{!"int", i1 false, !"test_operator_new_nothrow"}
-// CHECK: [[META_INT_NEW]] = !{!"int", i1 false, !"test_new"}
-// CHECK: [[META_INT_NEW_ARR]] = !{!"int", i1 false, !"test_new_array"}
-// CHECK: [[META_INT_NEW_NOTHROW]] = !{!"int", i1 false, !"test_new_nothrow"}
-// CHECK: [[META_INT_NEW_ARR_NOTHROW]] = !{!"int", i1 false, !"test_new_array_nothrow"}
-// CHECK: [[META_LONG_SIZE_RET_NEW]] = !{!"long", i1 false, !"test_size_returning_new"}
-// CHECK: [[META_TESTCLASS_EXC]] = !{!"TestClass", i1 true, !"test_exception_handling_new"}
-// CHECK: [[META_TESTCLASS_NEW]] = !{!"TestClass", i1 true, !"test_new_class"}
-// CHECK: [[META_TESTCLASS_NEW_ARR]] = !{!"TestClass", i1 true, !"test_new_class_array"}
+// CHECK: [[META_INT]] = !{!"int", i1 false}
+// CHECK: [[META_LONG]] = !{!"long", i1 false}
+// CHECK: [[META_TESTCLASS]] = !{!"TestClass", i1 true}
