@@ -51,5 +51,7 @@
 // CHECK-MODE-TYPEHASH: "-falloc-token-mode=typehash"
 // RUN: %clang --target=x86_64-linux-gnu -Xclang -falloc-token-mode=typehashpointersplit %s -### 2>&1 | FileCheck -check-prefix=CHECK-MODE-TYPEHASHPTRSPLIT %s
 // CHECK-MODE-TYPEHASHPTRSPLIT: "-falloc-token-mode=typehashpointersplit"
+// RUN: %clang --target=x86_64-linux-gnu -Xclang -falloc-token-mode=typesitehashpointersplit %s -### 2>&1 | FileCheck -check-prefix=CHECK-MODE-TYPESITEHASHPTRSPLIT %s
+// CHECK-MODE-TYPESITEHASHPTRSPLIT: "-falloc-token-mode=typesitehashpointersplit"
 // RUN: not %clang --target=x86_64-linux-gnu -Xclang -falloc-token-mode=asdf %s 2>&1 | FileCheck -check-prefix=CHECK-INVALID-MODE %s
 // CHECK-INVALID-MODE: error: invalid value 'asdf'

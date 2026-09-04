@@ -1344,7 +1344,8 @@ void CodeGenFunction::EmitBoundsCheckImpl(const Expr *ArrayExpr,
 }
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, getContext());
+  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, CurFuncDecl,
+                                                 getContext());
   if (!ATMD)
     return nullptr;
 
@@ -1352,8 +1353,17 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
   auto *TypeNameMD = MDB.createString(ATMD->TypeName);
   auto *ContainsPtrC = Builder.getInt1(ATMD->ContainsPointer);
   auto *ContainsPtrMD = MDB.createConstant(ContainsPtrC);
+  auto Mode = getLangOpts().AllocTokenMode.value_or(
+      llvm::DefaultAllocTokenMode);
+  if (Mode == llvm::AllocTokenMode::TypeSiteHashPointerSplit) {
+    auto *AllocationSiteMD = MDB.createString(ATMD->AllocationSite);
+    // Format: !{<type-name>, <contains-pointer>, <allocation-site>}
+    return llvm::MDNode::get(
+        CGM.getLLVMContext(),
+        {TypeNameMD, ContainsPtrMD, AllocationSiteMD});
+  }
 
-  // Format: !{<type-name>, <contains-pointer>}
+  // The existing modes retain the original metadata format.
   return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
 }
 

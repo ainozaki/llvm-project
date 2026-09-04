@@ -1341,7 +1341,8 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
     return nullptr;
   if (A == B)
     return const_cast<MDNode *>(A);
-  if (A->getNumOperands() != 2 || B->getNumOperands() != 2)
+  if (A->getNumOperands() < 2 || A->getNumOperands() > 3 ||
+      B->getNumOperands() < 2 || B->getNumOperands() > 3)
     return nullptr;
   auto *CIA = mdconst::dyn_extract_or_null<ConstantInt>(A->getOperand(1));
   auto *CIB = mdconst::dyn_extract_or_null<ConstantInt>(B->getOperand(1));
@@ -1353,23 +1354,44 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
   if (!NameA || !NameB)
     return nullptr;
 
-  if (NameA == NameB)
-    return CIA->isOne() ? const_cast<MDNode *>(A) : const_cast<MDNode *>(B);
-
   LLVMContext &Ctx = A->getContext();
   StringRef StrA = NameA->getString();
   StringRef StrB = NameB->getString();
 
-  SmallString<64> Buffer;
-  Buffer.reserve(StrA.size() + 1 + StrB.size());
-  Buffer.append(StrA);
-  Buffer.push_back('|');
-  Buffer.append(StrB);
+  SmallString<64> MergedName;
+  if (NameA == NameB) {
+    MergedName.append(StrA);
+  } else {
+    MergedName.reserve(StrA.size() + 1 + StrB.size());
+    MergedName.append(StrA);
+    MergedName.push_back('|');
+    MergedName.append(StrB);
+  }
 
   bool MergedContainsPointer = CIA->isOne() || CIB->isOne();
-  Metadata *Ops[] = {MDString::get(Ctx, Buffer),
-                     ConstantAsMetadata::get(ConstantInt::get(
-                         Type::getInt1Ty(Ctx), MergedContainsPointer))};
+  SmallVector<Metadata *, 3> Ops{
+      MDString::get(Ctx, MergedName),
+      ConstantAsMetadata::get(
+          ConstantInt::get(Type::getInt1Ty(Ctx), MergedContainsPointer))};
+
+  // If both allocations have source sites, preserve both in the same ordered
+  // form used to merge type names. If either site is unavailable, omit the
+  // site so modes that require it use their fallback token.
+  if (A->getNumOperands() == 3 && B->getNumOperands() == 3) {
+    auto *SiteA = dyn_cast<MDString>(A->getOperand(2));
+    auto *SiteB = dyn_cast<MDString>(B->getOperand(2));
+    if (!SiteA || !SiteB)
+      return nullptr;
+    StringRef SiteStrA = SiteA->getString();
+    StringRef SiteStrB = SiteB->getString();
+    SmallString<128> MergedSite;
+    MergedSite.append(SiteStrA);
+    if (SiteA != SiteB) {
+      MergedSite.push_back('|');
+      MergedSite.append(SiteStrB);
+    }
+    Ops.push_back(MDString::get(Ctx, MergedSite));
+  }
   return MDNode::get(Ctx, Ops);
 }
 

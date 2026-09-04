@@ -17,7 +17,9 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
+#include "clang/Basic/SourceManager.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace clang;
 using namespace infer_alloc;
@@ -186,7 +188,8 @@ QualType infer_alloc::inferPossibleType(const CallExpr *E,
 }
 
 std::optional<llvm::AllocTokenMetadata>
-infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
+infer_alloc::getAllocTokenMetadata(QualType T, const Decl *ContextDecl,
+                                   const ASTContext &Ctx) {
   llvm::AllocTokenMetadata ATMD;
 
   // Get unique type name.
@@ -203,6 +206,25 @@ infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
   ATMD.ContainsPointer = typeContainsPointer(T, VisitedRD, IncompleteType);
   if (!ATMD.ContainsPointer && IncompleteType)
     return std::nullopt;
+
+  // Use the enclosing declaration's remapped filename and the unqualified
+  // function name as the allocation site. This keeps token IDs stable when
+  // code moves within a function.
+  if (!ContextDecl)
+    return ATMD;
+
+  const SourceManager &SM = Ctx.getSourceManager();
+  PresumedLoc PLoc = SM.getPresumedLoc(ContextDecl->getLocation());
+  if (PLoc.isValid()) {
+    llvm::SmallString<128> Filename(PLoc.getFilename());
+    Ctx.getLangOpts().remapPathPrefix(Filename);
+    llvm::raw_svector_ostream OS(ATMD.AllocationSite);
+    OS << Filename << ':';
+    if (const auto *FD = dyn_cast<FunctionDecl>(ContextDecl))
+      FD->printName(OS);
+    else
+      OS << "<global>";
+  }
 
   return ATMD;
 }

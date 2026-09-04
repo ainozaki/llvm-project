@@ -24,6 +24,8 @@ llvm::getAllocTokenModeFromString(StringRef Name) {
       .Case("random", AllocTokenMode::Random)
       .Case("typehash", AllocTokenMode::TypeHash)
       .Case("typehashpointersplit", AllocTokenMode::TypeHashPointerSplit)
+      .Case("typesitehashpointersplit",
+            AllocTokenMode::TypeSiteHashPointerSplit)
       .Case("default", DefaultAllocTokenMode)
       .Default(std::nullopt);
 }
@@ -38,6 +40,8 @@ StringRef llvm::getAllocTokenModeAsString(AllocTokenMode Mode) {
     return "typehash";
   case AllocTokenMode::TypeHashPointerSplit:
     return "typehashpointersplit";
+  case AllocTokenMode::TypeSiteHashPointerSplit:
+    return "typesitehashpointersplit";
   }
   llvm_unreachable("Unknown AllocTokenMode");
 }
@@ -45,6 +49,16 @@ StringRef llvm::getAllocTokenModeAsString(AllocTokenMode Mode) {
 static uint64_t getStableHash(const AllocTokenMetadata &Metadata,
                               uint64_t MaxTokens) {
   return getStableSipHash(Metadata.TypeName) % MaxTokens;
+}
+
+static uint64_t getStableTypeSiteHash(const AllocTokenMetadata &Metadata,
+                                      uint64_t MaxTokens) {
+  SmallString<192> HashInput(Metadata.TypeName);
+  // Separate the two components unambiguously. SmallString and StringRef may
+  // contain embedded NUL bytes, and getStableSipHash hashes the full length.
+  HashInput.push_back('\0');
+  HashInput.append(Metadata.AllocationSite);
+  return getStableSipHash(HashInput) % MaxTokens;
 }
 
 std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
@@ -66,6 +80,16 @@ std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
       return 0;
     const uint64_t HalfTokens = MaxTokens / 2;
     uint64_t Hash = getStableHash(Metadata, HalfTokens);
+    if (Metadata.ContainsPointer)
+      Hash += HalfTokens;
+    return Hash;
+  }
+
+  case AllocTokenMode::TypeSiteHashPointerSplit: {
+    if (Metadata.AllocationSite.empty() || MaxTokens == 1)
+      return 0;
+    const uint64_t HalfTokens = MaxTokens / 2;
+    uint64_t Hash = getStableTypeSiteHash(Metadata, HalfTokens);
     if (Metadata.ContainsPointer)
       Hash += HalfTokens;
     return Hash;
