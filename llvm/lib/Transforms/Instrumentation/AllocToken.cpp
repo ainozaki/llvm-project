@@ -104,7 +104,7 @@ STATISTIC(NumAllocationsInstrumented, "Allocations instrumented");
 
 /// Returns the !alloc_token metadata if available.
 ///
-/// Expected format is: !{<type-name>, <contains-pointer>}
+/// Expected format is: !{<type-name>, <contains-pointer>[, <func-name>]}
 MDNode *getAllocTokenMetadata(const CallBase &CB) {
   MDNode *Ret = nullptr;
   if (auto *II = dyn_cast<IntrinsicInst>(&CB);
@@ -119,9 +119,12 @@ MDNode *getAllocTokenMetadata(const CallBase &CB) {
     if (!Ret)
       return nullptr;
   }
-  assert(Ret->getNumOperands() == 2 && "bad !alloc_token");
+  assert((Ret->getNumOperands() == 2 || Ret->getNumOperands() == 3) &&
+         "bad !alloc_token");
   assert(isa<MDString>(Ret->getOperand(0)));
   assert(isa<ConstantAsMetadata>(Ret->getOperand(1)));
+  if (Ret->getNumOperands() >= 3)
+    assert(isa<MDString>(Ret->getOperand(2)));
   return Ret;
 }
 
@@ -129,6 +132,15 @@ bool containsPointer(const MDNode *MD) {
   ConstantAsMetadata *C = cast<ConstantAsMetadata>(MD->getOperand(1));
   auto *CI = cast<ConstantInt>(C->getValue());
   return CI->getValue().getBoolValue();
+}
+
+AllocTokenMetadata extractMetadata(const CallBase &CB, const MDNode *N) {
+  MDString *S = cast<MDString>(N->getOperand(0));
+  StringRef FuncName =
+      (N->getNumOperands() >= 3)
+          ? cast<MDString>(N->getOperand(2))->getString()
+          : (CB.getFunction() ? CB.getFunction()->getName() : "");
+  return AllocTokenMetadata{S->getString(), containsPointer(N), FuncName};
 }
 
 class ModeBase {
@@ -184,8 +196,7 @@ public:
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
 
     if (MDNode *N = getAllocTokenMetadata(CB)) {
-      MDString *S = cast<MDString>(N->getOperand(0));
-      AllocTokenMetadata Metadata{S->getString(), containsPointer(N)};
+      AllocTokenMetadata Metadata = extractMetadata(CB, N);
       if (auto Token = getAllocToken(TokenMode::TypeHash, Metadata, MaxTokens))
         return *Token;
     }
@@ -216,8 +227,7 @@ public:
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
     if (MDNode *N = getAllocTokenMetadata(CB)) {
-      MDString *S = cast<MDString>(N->getOperand(0));
-      AllocTokenMetadata Metadata{S->getString(), containsPointer(N)};
+      AllocTokenMetadata Metadata = extractMetadata(CB, N);
       if (auto Token = getAllocToken(TokenMode::TypeHashPointerSplit, Metadata,
                                      MaxTokens))
         return *Token;
@@ -225,6 +235,40 @@ public:
     // Pick the fallback token (ClFallbackToken), which by default is 0, meaning
     // it'll fall into the pointer-less bucket. Override by setting
     // -alloc-token-fallback if that is the wrong choice.
+    remarkNoMetadata(CB, ORE);
+    return ClFallbackToken;
+  }
+};
+
+/// Implementation for TokenMode::TypeFuncHash.
+class TypeFuncHashMode : public TypeHashMode {
+public:
+  using TypeHashMode::TypeHashMode;
+
+  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
+    if (MDNode *N = getAllocTokenMetadata(CB)) {
+      AllocTokenMetadata Metadata = extractMetadata(CB, N);
+      if (auto Token =
+              getAllocToken(TokenMode::TypeFuncHash, Metadata, MaxTokens))
+        return *Token;
+    }
+    remarkNoMetadata(CB, ORE);
+    return ClFallbackToken;
+  }
+};
+
+/// Implementation for TokenMode::TypeFuncHashPointerSplit.
+class TypeFuncHashPointerSplitMode : public TypeHashMode {
+public:
+  using TypeHashMode::TypeHashMode;
+
+  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
+    if (MDNode *N = getAllocTokenMetadata(CB)) {
+      AllocTokenMetadata Metadata = extractMetadata(CB, N);
+      if (auto Token = getAllocToken(TokenMode::TypeFuncHashPointerSplit,
+                                     Metadata, MaxTokens))
+        return *Token;
+    }
     remarkNoMetadata(CB, ORE);
     return ClFallbackToken;
   }
@@ -278,6 +322,12 @@ public:
     case TokenMode::TypeHashPointerSplit:
       Mode.emplace<TypeHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
       break;
+    case TokenMode::TypeFuncHash:
+      Mode.emplace<TypeFuncHashMode>(*IntPtrTy, Options.MaxTokens);
+      break;
+    case TokenMode::TypeFuncHashPointerSplit:
+      Mode.emplace<TypeFuncHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
+      break;
     }
   }
 
@@ -321,7 +371,8 @@ private:
   DenseMap<std::pair<LibFunc, uint64_t>, FunctionCallee> TokenAllocFunctions;
   // Selected mode.
   std::variant<IncrementMode, RandomMode, TypeHashMode,
-               TypeHashPointerSplitMode>
+               TypeHashPointerSplitMode, TypeFuncHashMode,
+               TypeFuncHashPointerSplitMode>
       Mode;
 };
 

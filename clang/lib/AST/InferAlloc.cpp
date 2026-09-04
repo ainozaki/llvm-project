@@ -186,7 +186,8 @@ QualType infer_alloc::inferPossibleType(const CallExpr *E,
 }
 
 std::optional<llvm::AllocTokenMetadata>
-infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
+infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx,
+                                   const FunctionDecl *FD) {
   llvm::AllocTokenMetadata ATMD;
 
   // Get unique type name.
@@ -203,6 +204,11 @@ infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
   ATMD.ContainsPointer = typeContainsPointer(T, VisitedRD, IncompleteType);
   if (!ATMD.ContainsPointer && IncompleteType)
     return std::nullopt;
+
+  if (FD) {
+    llvm::raw_svector_ostream FuncNameOS(ATMD.FuncName);
+    FD->printQualifiedName(FuncNameOS);
+  }
 
   return ATMD;
 }

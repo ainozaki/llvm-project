@@ -17327,9 +17327,16 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (AllocType.isNull())
       return Error(
           E, diag::note_constexpr_infer_alloc_token_type_inference_failed);
-    auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, Info.Ctx);
+    const FunctionDecl *FD =
+        Info.CurrentCall ? Info.CurrentCall->Callee : nullptr;
+    if (!FD && Info.EvaluatingDecl.is<const ValueDecl *>())
+      FD = dyn_cast_or_null<FunctionDecl>(
+          Info.EvaluatingDecl.get<const ValueDecl *>());
+
+    auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, Info.Ctx, FD);
     if (!ATMD)
       return Error(E, diag::note_constexpr_infer_alloc_token_no_metadata);
+
     auto Mode =
         Info.getLangOpts().AllocTokenMode.value_or(llvm::DefaultAllocTokenMode);
     uint64_t BitWidth = Info.Ctx.getTypeSize(Info.Ctx.getSizeType());

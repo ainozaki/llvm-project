@@ -20,4 +20,4 @@ void test_nonlibcall_alloc() {
   sink = __kmalloc(sizeof(int), 0);
 }
 
-// CHECK: [[META_INT]] = !{!"int", i1 false}
+// CHECK: [[META_INT]] = !{!"int", i1 false, !"test_nonlibcall_alloc"}

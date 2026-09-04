@@ -1341,7 +1341,8 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
     return nullptr;
   if (A == B)
     return const_cast<MDNode *>(A);
-  if (A->getNumOperands() != 2 || B->getNumOperands() != 2)
+  if (A->getNumOperands() < 2 || A->getNumOperands() > 3 ||
+      B->getNumOperands() < 2 || B->getNumOperands() > 3)
     return nullptr;
   auto *CIA = mdconst::dyn_extract_or_null<ConstantInt>(A->getOperand(1));
   auto *CIB = mdconst::dyn_extract_or_null<ConstantInt>(B->getOperand(1));
@@ -1353,23 +1354,43 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
   if (!NameA || !NameB)
     return nullptr;
 
-  if (NameA == NameB)
+  MDString *FuncA = (A->getNumOperands() >= 3)
+                        ? dyn_cast_or_null<MDString>(A->getOperand(2))
+                        : nullptr;
+  MDString *FuncB = (B->getNumOperands() >= 3)
+                        ? dyn_cast_or_null<MDString>(B->getOperand(2))
+                        : nullptr;
+
+  if (NameA == NameB && FuncA == FuncB)
     return CIA->isOne() ? const_cast<MDNode *>(A) : const_cast<MDNode *>(B);
 
+  auto MergeStrings = [](StringRef StrA, StringRef StrB) -> SmallString<64> {
+    if (StrA.empty())
+      return SmallString<64>(StrB);
+    if (StrB.empty() || StrA == StrB)
+      return SmallString<64>(StrA);
+    SmallString<64> Buffer;
+    Buffer.reserve(StrA.size() + 1 + StrB.size());
+    Buffer.append(StrA);
+    Buffer.push_back('|');
+    Buffer.append(StrB);
+    return Buffer;
+  };
+
   LLVMContext &Ctx = A->getContext();
-  StringRef StrA = NameA->getString();
-  StringRef StrB = NameB->getString();
-
-  SmallString<64> Buffer;
-  Buffer.reserve(StrA.size() + 1 + StrB.size());
-  Buffer.append(StrA);
-  Buffer.push_back('|');
-  Buffer.append(StrB);
-
   bool MergedContainsPointer = CIA->isOne() || CIB->isOne();
-  Metadata *Ops[] = {MDString::get(Ctx, Buffer),
-                     ConstantAsMetadata::get(ConstantInt::get(
-                         Type::getInt1Ty(Ctx), MergedContainsPointer))};
+  SmallVector<Metadata *, 3> Ops;
+  Ops.push_back(
+      MDString::get(Ctx, MergeStrings(NameA->getString(), NameB->getString())));
+  Ops.push_back(ConstantAsMetadata::get(
+      ConstantInt::get(Type::getInt1Ty(Ctx), MergedContainsPointer)));
+
+  if (FuncA || FuncB) {
+    StringRef FStrA = FuncA ? FuncA->getString() : "";
+    StringRef FStrB = FuncB ? FuncB->getString() : "";
+    Ops.push_back(MDString::get(Ctx, MergeStrings(FStrA, FStrB)));
+  }
+
   return MDNode::get(Ctx, Ops);
 }
 

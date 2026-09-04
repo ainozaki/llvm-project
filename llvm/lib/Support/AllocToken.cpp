@@ -24,6 +24,8 @@ llvm::getAllocTokenModeFromString(StringRef Name) {
       .Case("random", AllocTokenMode::Random)
       .Case("typehash", AllocTokenMode::TypeHash)
       .Case("typehashpointersplit", AllocTokenMode::TypeHashPointerSplit)
+      .Case("typefunchash", AllocTokenMode::TypeFuncHash)
+      .Case("typefunchashpointersplit", AllocTokenMode::TypeFuncHashPointerSplit)
       .Case("default", DefaultAllocTokenMode)
       .Default(std::nullopt);
 }
@@ -38,6 +40,10 @@ StringRef llvm::getAllocTokenModeAsString(AllocTokenMode Mode) {
     return "typehash";
   case AllocTokenMode::TypeHashPointerSplit:
     return "typehashpointersplit";
+  case AllocTokenMode::TypeFuncHash:
+    return "typefunchash";
+  case AllocTokenMode::TypeFuncHashPointerSplit:
+    return "typefunchashpointersplit";
   }
   llvm_unreachable("Unknown AllocTokenMode");
 }
@@ -45,6 +51,15 @@ StringRef llvm::getAllocTokenModeAsString(AllocTokenMode Mode) {
 static uint64_t getStableHash(const AllocTokenMetadata &Metadata,
                               uint64_t MaxTokens) {
   return getStableSipHash(Metadata.TypeName) % MaxTokens;
+}
+
+static uint64_t getStableFuncTypeHash(const AllocTokenMetadata &Metadata,
+                                      uint64_t MaxTokens) {
+  SmallString<128> Buffer;
+  Buffer.append(Metadata.TypeName);
+  Buffer.push_back(':');
+  Buffer.append(Metadata.FuncName);
+  return getStableSipHash(Buffer) % MaxTokens;
 }
 
 std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
@@ -66,6 +81,19 @@ std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
       return 0;
     const uint64_t HalfTokens = MaxTokens / 2;
     uint64_t Hash = getStableHash(Metadata, HalfTokens);
+    if (Metadata.ContainsPointer)
+      Hash += HalfTokens;
+    return Hash;
+  }
+
+  case AllocTokenMode::TypeFuncHash:
+    return getStableFuncTypeHash(Metadata, MaxTokens);
+
+  case AllocTokenMode::TypeFuncHashPointerSplit: {
+    if (MaxTokens == 1)
+      return 0;
+    const uint64_t HalfTokens = MaxTokens / 2;
+    uint64_t Hash = getStableFuncTypeHash(Metadata, HalfTokens);
     if (Metadata.ContainsPointer)
       Hash += HalfTokens;
     return Hash;

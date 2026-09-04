@@ -27,7 +27,7 @@ int **test_malloc_ptr() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z12test_new_intv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 4){{.*}} !alloc_token [[META_INT_NEW:![0-9]+]]
 int *test_new_int() {
   return new int;
 }
@@ -39,13 +39,13 @@ unsigned long *test_new_ulong_array() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z12test_new_ptrv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 8){{.*}} !alloc_token [[META_INTPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 8){{.*}} !alloc_token [[META_INTPTR_NEW:![0-9]+]]
 int **test_new_ptr() {
   return new int*;
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z18test_new_ptr_arrayv(
-// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 80){{.*}} !alloc_token [[META_INTPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 80){{.*}} !alloc_token [[META_INTPTR_NEW_ARR:![0-9]+]]
 int **test_new_ptr_array() {
   return new int*[10];
 }
@@ -62,13 +62,13 @@ void *test_malloc_struct_with_ptr() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z33test_malloc_struct_array_with_ptrv(
-// CHECK: call noalias ptr @malloc(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias ptr @malloc(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR_ARR:![0-9]+]]
 void *test_malloc_struct_array_with_ptr() {
   return malloc(10 * sizeof(ContainsPtr));
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z31test_malloc_with_ptr_sizeof_vari(
-// CHECK: call noalias ptr @malloc(i64 noundef {{.*}}){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias ptr @malloc(i64 noundef {{.*}}){{.*}} !alloc_token [[META_CONTAINSPTR_SIZEOF_VAR:![0-9]+]]
 void *test_malloc_with_ptr_sizeof_var(int x) {
   unsigned long size = sizeof(ContainsPtr);
   size *= x;
@@ -76,14 +76,14 @@ void *test_malloc_with_ptr_sizeof_var(int x) {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z29test_malloc_with_ptr_castonlyv(
-// CHECK: call noalias ptr @malloc(i64 noundef 4096){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias ptr @malloc(i64 noundef 4096){{.*}} !alloc_token [[META_CONTAINSPTR_CASTONLY:![0-9]+]]
 ContainsPtr *test_malloc_with_ptr_castonly() {
   return (ContainsPtr *)malloc(4096);
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z32test_operatornew_struct_with_ptrv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR]]
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW]]
 ContainsPtr *test_operatornew_struct_with_ptr() {
   ContainsPtr *c = (ContainsPtr *)__builtin_operator_new(sizeof(ContainsPtr));
   sink = ::operator new(sizeof(ContainsPtr));
@@ -91,8 +91,8 @@ ContainsPtr *test_operatornew_struct_with_ptr() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z38test_operatornew_struct_array_with_ptrv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR]]
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW_ARR:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW_ARR]]
 ContainsPtr *test_operatornew_struct_array_with_ptr() {
   ContainsPtr *c = (ContainsPtr *)__builtin_operator_new(10 * sizeof(ContainsPtr));
   sink = ::operator new(10 * sizeof(ContainsPtr));
@@ -100,8 +100,8 @@ ContainsPtr *test_operatornew_struct_array_with_ptr() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z33test_operatornew_struct_with_ptr2v(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR]]
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW2:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW2]]
 ContainsPtr *test_operatornew_struct_with_ptr2() {
   ContainsPtr *c = (ContainsPtr *)__builtin_operator_new(sizeof(*c));
   sink = ::operator new(sizeof(*c));
@@ -109,8 +109,8 @@ ContainsPtr *test_operatornew_struct_with_ptr2() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z39test_operatornew_struct_array_with_ptr2v(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR]]
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW_ARR2:![0-9]+]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR_OPNEW_ARR2]]
 ContainsPtr *test_operatornew_struct_array_with_ptr2() {
   ContainsPtr *c = (ContainsPtr *)__builtin_operator_new(10 * sizeof(*c));
   sink = ::operator new(10 * sizeof(*c));
@@ -118,13 +118,13 @@ ContainsPtr *test_operatornew_struct_array_with_ptr2() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z24test_new_struct_with_ptrv(
-// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znwm(i64 noundef 16){{.*}} !alloc_token [[META_CONTAINSPTR_NEW:![0-9]+]]
 ContainsPtr *test_new_struct_with_ptr() {
   return new ContainsPtr;
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z30test_new_struct_array_with_ptrv(
-// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR]]
+// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 160){{.*}} !alloc_token [[META_CONTAINSPTR_NEW_ARR:![0-9]+]]
 ContainsPtr *test_new_struct_array_with_ptr() {
   return new ContainsPtr[10];
 }
@@ -143,7 +143,7 @@ TestClass *test_new_class() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z20test_new_class_arrayv(
-// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 648){{.*}} !alloc_token [[META_TESTCLASS]]
+// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 648){{.*}} !alloc_token [[META_TESTCLASS_NEW_ARR:![0-9]+]]
 TestClass *test_new_class_array() {
   return new TestClass[10];
 }
@@ -163,7 +163,7 @@ VirtualTestClass *test_new_virtual_class() {
 }
 
 // CHECK-LABEL: define dso_local noundef ptr @_Z28test_new_virtual_class_arrayv(
-// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 728){{.*}} !alloc_token [[META_VIRTUALTESTCLASS]]
+// CHECK: call noalias noundef nonnull ptr @_Znam(i64 noundef 728){{.*}} !alloc_token [[META_VIRTUALTESTCLASS_ARR:![0-9]+]]
 VirtualTestClass *test_new_virtual_class_array() {
   return new VirtualTestClass[10];
 }
@@ -239,16 +239,30 @@ StructWithPMD *test_struct_with_pmd() {
   return new StructWithPMD;
 }
 
-// CHECK: [[META_INT]] = !{!"int", i1 false}
-// CHECK: [[META_INTPTR]] = !{!"int *", i1 true}
-// CHECK: [[META_ULONG]] = !{!"unsigned long", i1 false}
-// CHECK: [[META_CONTAINSPTR]] = !{!"ContainsPtr", i1 true}
-// CHECK: [[META_TESTCLASS]] = !{!"TestClass", i1 false}
-// CHECK: [[META_VIRTUALTESTCLASS]] = !{!"VirtualTestClass", i1 true}
-// CHECK: [[META_MYSTRUCTUINTPTR]] = !{!"MyStructUintptr", i1 true}
-// CHECK: [[META_UINTPTR]] = !{!"unsigned long", i1 true}
-// CHECK: [[META_STRUCTWITHATOMIC]] = !{!"StructWithAtomic", i1 true}
-// CHECK: [[META_STRUCTWITHATOMICNONPTR]] = !{!"StructWithAtomicNonPtr", i1 false}
-// CHECK: [[META_STRUCTWITHREF]] = !{!"StructWithRef", i1 true}
-// CHECK: [[META_STRUCTWITHPMF]] = !{!"StructWithPMF", i1 true}
-// CHECK: [[META_STRUCTWITHPMD]] = !{!"StructWithPMD", i1 false}
+// CHECK: [[META_INT]] = !{!"int", i1 false, !"test_malloc_int"}
+// CHECK: [[META_INTPTR]] = !{!"int *", i1 true, !"test_malloc_ptr"}
+// CHECK: [[META_INT_NEW]] = !{!"int", i1 false, !"test_new_int"}
+// CHECK: [[META_ULONG]] = !{!"unsigned long", i1 false, !"test_new_ulong_array"}
+// CHECK: [[META_INTPTR_NEW]] = !{!"int *", i1 true, !"test_new_ptr"}
+// CHECK: [[META_INTPTR_NEW_ARR]] = !{!"int *", i1 true, !"test_new_ptr_array"}
+// CHECK: [[META_CONTAINSPTR]] = !{!"ContainsPtr", i1 true, !"test_malloc_struct_with_ptr"}
+// CHECK: [[META_CONTAINSPTR_ARR]] = !{!"ContainsPtr", i1 true, !"test_malloc_struct_array_with_ptr"}
+// CHECK: [[META_CONTAINSPTR_SIZEOF_VAR]] = !{!"ContainsPtr", i1 true, !"test_malloc_with_ptr_sizeof_var"}
+// CHECK: [[META_CONTAINSPTR_CASTONLY]] = !{!"ContainsPtr", i1 true, !"test_malloc_with_ptr_castonly"}
+// CHECK: [[META_CONTAINSPTR_OPNEW]] = !{!"ContainsPtr", i1 true, !"test_operatornew_struct_with_ptr"}
+// CHECK: [[META_CONTAINSPTR_OPNEW_ARR]] = !{!"ContainsPtr", i1 true, !"test_operatornew_struct_array_with_ptr"}
+// CHECK: [[META_CONTAINSPTR_OPNEW2]] = !{!"ContainsPtr", i1 true, !"test_operatornew_struct_with_ptr2"}
+// CHECK: [[META_CONTAINSPTR_OPNEW_ARR2]] = !{!"ContainsPtr", i1 true, !"test_operatornew_struct_array_with_ptr2"}
+// CHECK: [[META_CONTAINSPTR_NEW]] = !{!"ContainsPtr", i1 true, !"test_new_struct_with_ptr"}
+// CHECK: [[META_CONTAINSPTR_NEW_ARR]] = !{!"ContainsPtr", i1 true, !"test_new_struct_array_with_ptr"}
+// CHECK: [[META_TESTCLASS]] = !{!"TestClass", i1 false, !"test_new_class"}
+// CHECK: [[META_TESTCLASS_NEW_ARR]] = !{!"TestClass", i1 false, !"test_new_class_array"}
+// CHECK: [[META_VIRTUALTESTCLASS]] = !{!"VirtualTestClass", i1 true, !"test_new_virtual_class"}
+// CHECK: [[META_VIRTUALTESTCLASS_ARR]] = !{!"VirtualTestClass", i1 true, !"test_new_virtual_class_array"}
+// CHECK: [[META_MYSTRUCTUINTPTR]] = !{!"MyStructUintptr", i1 true, !"test_uintptr_isptr"}
+// CHECK: [[META_UINTPTR]] = !{!"unsigned long", i1 true, !"test_uintptr_isptr2"}
+// CHECK: [[META_STRUCTWITHATOMIC]] = !{!"StructWithAtomic", i1 true, !"test_struct_with_atomic"}
+// CHECK: [[META_STRUCTWITHATOMICNONPTR]] = !{!"StructWithAtomicNonPtr", i1 false, !"test_struct_with_atomic_nonptr"}
+// CHECK: [[META_STRUCTWITHREF]] = !{!"StructWithRef", i1 true, !"test_struct_with_ref"}
+// CHECK: [[META_STRUCTWITHPMF]] = !{!"StructWithPMF", i1 true, !"test_struct_with_pmf"}
+// CHECK: [[META_STRUCTWITHPMD]] = !{!"StructWithPMD", i1 false, !"test_struct_with_pmd"}

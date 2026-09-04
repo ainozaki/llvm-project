@@ -1546,7 +1546,8 @@ static bool interp__builtin_infer_alloc_token(InterpState &S, CodePtr OpPC,
     return false;
   }
 
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, ASTCtx);
+  const FunctionDecl *FD = Frame ? Frame->getCallee() : nullptr;
+  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, ASTCtx, FD);
   if (!ATMD) {
     S.CCEDiag(Call, diag::note_constexpr_infer_alloc_token_no_metadata);
     return false;

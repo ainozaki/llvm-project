@@ -1344,7 +1344,8 @@ void CodeGenFunction::EmitBoundsCheckImpl(const Expr *ArrayExpr,
 }
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, getContext());
+  const auto *FD = dyn_cast_or_null<FunctionDecl>(CurFuncDecl);
+  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, getContext(), FD);
   if (!ATMD)
     return nullptr;
 
@@ -1352,9 +1353,11 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
   auto *TypeNameMD = MDB.createString(ATMD->TypeName);
   auto *ContainsPtrC = Builder.getInt1(ATMD->ContainsPointer);
   auto *ContainsPtrMD = MDB.createConstant(ContainsPtrC);
+  auto *FuncNameMD = MDB.createString(ATMD->FuncName);
 
-  // Format: !{<type-name>, <contains-pointer>}
-  return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
+  // Format: !{<type-name>, <contains-pointer>, <func-name>}
+  return llvm::MDNode::get(CGM.getLLVMContext(),
+                           {TypeNameMD, ContainsPtrMD, FuncNameMD});
 }
 
 void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {

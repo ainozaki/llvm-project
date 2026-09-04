@@ -24,5 +24,5 @@ StructWithObjCPtr *test_struct_with_objc_ptr() {
   return new StructWithObjCPtr;
 }
 
-// CHECK: [[META_STRUCTWITHBLOCK]] = !{!"StructWithBlock", i1 true}
-// CHECK: [[META_STRUCTWITHOBJCPTR]] = !{!"StructWithObjCPtr", i1 true}
+// CHECK: [[META_STRUCTWITHBLOCK]] = !{!"StructWithBlock", i1 true, !"test_struct_with_block"}
+// CHECK: [[META_STRUCTWITHOBJCPTR]] = !{!"StructWithObjCPtr", i1 true, !"test_struct_with_objc_ptr"}
