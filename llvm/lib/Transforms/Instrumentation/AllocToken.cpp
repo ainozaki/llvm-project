@@ -102,10 +102,10 @@ STATISTIC(NumAllocationsInstrumented, "Allocations instrumented");
 
 //===----------------------------------------------------------------------===//
 
-/// Returns the !alloc_token metadata if available.
+/// Returns the allocation token metadata if available.
 ///
-/// Expected format is: !{<type-name>, <contains-pointer>}
-MDNode *getAllocTokenMetadata(const CallBase &CB) {
+/// Expected format is: !{<type-name>, <contains-pointer>[, <func-name>]}
+std::optional<AllocTokenMetadata> getAllocTokenMetadata(const CallBase &CB) {
   MDNode *Ret = nullptr;
   if (auto *II = dyn_cast<IntrinsicInst>(&CB);
       II && II->getIntrinsicID() == Intrinsic::alloc_token_id) {
@@ -113,22 +113,27 @@ MDNode *getAllocTokenMetadata(const CallBase &CB) {
     Ret = cast<MDNode>(MDV->getMetadata());
     // If the intrinsic has an empty MDNode, type inference failed.
     if (Ret->getNumOperands() == 0)
-      return nullptr;
+      return std::nullopt;
   } else {
     Ret = CB.getMetadata(LLVMContext::MD_alloc_token);
     if (!Ret)
-      return nullptr;
+      return std::nullopt;
   }
-  assert(Ret->getNumOperands() == 2 && "bad !alloc_token");
+  assert((Ret->getNumOperands() == 2 || Ret->getNumOperands() == 3) &&
+         "bad !alloc_token");
   assert(isa<MDString>(Ret->getOperand(0)));
   assert(isa<ConstantAsMetadata>(Ret->getOperand(1)));
-  return Ret;
-}
+  if (Ret->getNumOperands() >= 3)
+    assert(isa<MDString>(Ret->getOperand(2)));
 
-bool containsPointer(const MDNode *MD) {
-  ConstantAsMetadata *C = cast<ConstantAsMetadata>(MD->getOperand(1));
-  auto *CI = cast<ConstantInt>(C->getValue());
-  return CI->getValue().getBoolValue();
+  MDString *S = cast<MDString>(Ret->getOperand(0));
+  auto *ContainsPointer = cast<ConstantInt>(
+      cast<ConstantAsMetadata>(Ret->getOperand(1))->getValue());
+  std::optional<SmallString<64>> FuncName;
+  if (Ret->getNumOperands() >= 3)
+    FuncName.emplace(cast<MDString>(Ret->getOperand(2))->getString());
+  return AllocTokenMetadata{
+      S->getString(), ContainsPointer->getValue().getBoolValue(), FuncName};
 }
 
 class ModeBase {
@@ -174,27 +179,31 @@ private:
   std::unique_ptr<RandomNumberGenerator> RNG;
 };
 
-/// Implementation for TokenMode::TypeHash. The implementation ensures
-/// hashes are stable across different compiler invocations. Uses SipHash as the
-/// hash function.
-class TypeHashMode : public ModeBase {
+/// Implementation for the hash-based token modes. The implementation ensures
+/// hashes are stable across different compiler invocations.
+class HashMode : public ModeBase {
 public:
-  using ModeBase::ModeBase;
+  HashMode(const IntegerType &TokenTy, uint64_t MaxTokens, TokenMode Mode)
+      : ModeBase(TokenTy, MaxTokens), Mode(Mode) {
+    assert(Mode == TokenMode::TypeHash ||
+           Mode == TokenMode::TypeHashPointerSplit ||
+           Mode == TokenMode::TypeFuncHash ||
+           Mode == TokenMode::TypeFuncHashPointerSplit);
+  }
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      MDString *S = cast<MDString>(N->getOperand(0));
-      AllocTokenMetadata Metadata{S->getString(), containsPointer(N)};
-      if (auto Token = getAllocToken(TokenMode::TypeHash, Metadata, MaxTokens))
+    if (auto Metadata = getAllocTokenMetadata(CB))
+      if (auto Token = getAllocToken(Mode, *Metadata, MaxTokens))
         return *Token;
-    }
-    // Fallback.
+
+    // Pick the fallback token (ClFallbackToken), which by default is 0, meaning
+    // it'll fall into the pointer-less bucket. Override by setting
+    // -alloc-token-fallback if that is the wrong choice.
     remarkNoMetadata(CB, ORE);
     return ClFallbackToken;
   }
 
-protected:
+private:
   /// Remark that there was no precise type information.
   static void remarkNoMetadata(const CallBase &CB,
                                OptimizationRemarkEmitter &ORE) {
@@ -207,27 +216,8 @@ protected:
              << "' without source-level type token";
     });
   }
-};
 
-/// Implementation for TokenMode::TypeHashPointerSplit.
-class TypeHashPointerSplitMode : public TypeHashMode {
-public:
-  using TypeHashMode::TypeHashMode;
-
-  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      MDString *S = cast<MDString>(N->getOperand(0));
-      AllocTokenMetadata Metadata{S->getString(), containsPointer(N)};
-      if (auto Token = getAllocToken(TokenMode::TypeHashPointerSplit, Metadata,
-                                     MaxTokens))
-        return *Token;
-    }
-    // Pick the fallback token (ClFallbackToken), which by default is 0, meaning
-    // it'll fall into the pointer-less bucket. Override by setting
-    // -alloc-token-fallback if that is the wrong choice.
-    remarkNoMetadata(CB, ORE);
-    return ClFallbackToken;
-  }
+  const TokenMode Mode;
 };
 
 // Apply opt overrides and module flags.
@@ -273,10 +263,10 @@ public:
                                M.createRNG(DEBUG_TYPE));
       break;
     case TokenMode::TypeHash:
-      Mode.emplace<TypeHashMode>(*IntPtrTy, Options.MaxTokens);
-      break;
     case TokenMode::TypeHashPointerSplit:
-      Mode.emplace<TypeHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
+    case TokenMode::TypeFuncHash:
+    case TokenMode::TypeFuncHashPointerSplit:
+      Mode.emplace<HashMode>(*IntPtrTy, Options.MaxTokens, Options.Mode);
       break;
     }
   }
@@ -320,9 +310,7 @@ private:
   // Cache for replacement functions.
   DenseMap<std::pair<LibFunc, uint64_t>, FunctionCallee> TokenAllocFunctions;
   // Selected mode.
-  std::variant<IncrementMode, RandomMode, TypeHashMode,
-               TypeHashPointerSplitMode>
-      Mode;
+  std::variant<IncrementMode, RandomMode, HashMode> Mode;
 };
 
 bool AllocToken::instrumentFunction(Function &F) {

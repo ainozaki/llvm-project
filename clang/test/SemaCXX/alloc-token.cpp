@@ -2,6 +2,9 @@
 // RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -falloc-token-max=0
 // RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -falloc-token-mode=typehash -DMODE_TYPEHASH
+// RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -falloc-token-mode=typefunchash -DMODE_TYPEFUNCHASH
+// RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -falloc-token-mode=typefunchashpointersplit -DMODE_TYPEFUNCHASHPOINTERSPLIT
+// RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -falloc-token-mode=typefunchashpointersplit -DMODE_TYPEFUNCHASHPOINTERSPLIT -fexperimental-new-constant-interpreter
 // RUN: %clang_cc1 -triple x86_64-linux-gnu -std=c++23 -fsyntax-only -verify %s -falloc-token-max=2 -DTOKEN_MAX=2
 // RUN: %clang_cc1 -triple arm-linux-androideabi -std=c++23 -fsyntax-only -verify %s -falloc-token-max=2 -DTOKEN_MAX=2
 // RUN: %clang_cc1 -triple arm-linux-androideabi -std=c++23 -fsyntax-only -verify %s -falloc-token-max=2 -DTOKEN_MAX=2 -fexperimental-new-constant-interpreter
@@ -26,6 +29,16 @@ static_assert(__builtin_infer_alloc_token(sizeof(int)) == 2689373973731826898ULL
 static_assert(__builtin_infer_alloc_token(sizeof(char*)) == 2250492667400517147ULL);
 static_assert(__builtin_infer_alloc_token(sizeof(NoPtr)) == 7465259095297095368ULL);
 static_assert(__builtin_infer_alloc_token(sizeof(WithPtr)) == 11898882936532569145ULL);
+#elif defined(MODE_TYPEFUNCHASH)
+static_assert(__builtin_infer_alloc_token(sizeof(int)) == 11800231689914271711ULL);
+static_assert(__builtin_infer_alloc_token(sizeof(char*)) == 6045774506664513975ULL);
+static_assert(__builtin_infer_alloc_token(sizeof(NoPtr)) == 4181086577478151473ULL);
+static_assert(__builtin_infer_alloc_token(sizeof(WithPtr)) == 240793509323179847ULL);
+#elif defined(MODE_TYPEFUNCHASHPOINTERSPLIT)
+static_assert(__builtin_infer_alloc_token(sizeof(int)) == 2576859653059495904ULL);
+static_assert(__builtin_infer_alloc_token(sizeof(char*)) == 15269146543519289782ULL);
+static_assert(__builtin_infer_alloc_token(sizeof(NoPtr)) == 4181086577478151473ULL);
+static_assert(__builtin_infer_alloc_token(sizeof(WithPtr)) == 9464165546177955654ULL);
 #elif defined(TOKEN_MAX)
 #  if TOKEN_MAX == 2
 static_assert(__builtin_infer_alloc_token(sizeof(int)) == 0);
@@ -47,6 +60,8 @@ template <typename T>
 constexpr unsigned long get_token() {
   return __builtin_infer_alloc_token(sizeof(T));
 }
+
+#if !defined(MODE_TYPEFUNCHASH) && !defined(MODE_TYPEFUNCHASHPOINTERSPLIT)
 static_assert(__builtin_infer_alloc_token(sizeof(int)) == get_token<int>());
 
 // Test complex expressions.
@@ -62,6 +77,34 @@ struct token_for_type {
   static constexpr unsigned long value = ID;
 };
 static_assert(token_for_type<__builtin_infer_alloc_token(sizeof(int)), int>::value == get_token<int>());
+#else
+// Test complex expressions.
+static_assert(__builtin_constant_p(__builtin_infer_alloc_token(sizeof(int))));
+static_assert(__builtin_infer_alloc_token(sizeof(NoPtr) * 2, 1) == __builtin_infer_alloc_token(sizeof(NoPtr)));
+static_assert(__builtin_infer_alloc_token(1, 4 + sizeof(NoPtr)) == __builtin_infer_alloc_token(sizeof(NoPtr)));
+static_assert(__builtin_infer_alloc_token(sizeof(NoPtr) << 8) == __builtin_infer_alloc_token(sizeof(NoPtr)));
+
+// Test usable as a template param.
+template <unsigned long ID, typename T>
+struct token_for_type {
+  static_assert(ID == __builtin_infer_alloc_token(sizeof(T)));
+  static constexpr unsigned long value = ID;
+};
+static_assert(token_for_type<__builtin_infer_alloc_token(sizeof(int)), int>::value == __builtin_infer_alloc_token(sizeof(int)));
+#endif
+
+constexpr unsigned long func_a() {
+  return __builtin_infer_alloc_token(sizeof(int));
+}
+constexpr unsigned long func_b() {
+  return __builtin_infer_alloc_token(sizeof(int));
+}
+#if defined(MODE_TYPEFUNCHASH) || defined(MODE_TYPEFUNCHASHPOINTERSPLIT)
+static_assert(func_a() != func_b());
+static_assert(func_a() != __builtin_infer_alloc_token(sizeof(int)));
+#else
+static_assert(func_a() == func_b());
+#endif
 
 template <typename T = void>
 void template_test() {

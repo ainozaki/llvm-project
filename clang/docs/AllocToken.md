@@ -37,6 +37,12 @@ change or removal. These may (experimentally) be selected with `-Xclang
 
 - `typehash`: This mode assigns a token ID based on the hash of the allocated
   type's name.
+- `typefunchash`: This mode assigns a token ID based on the combined hash of
+  the allocated type's name and the enclosing function's name.
+- `typefunchashpointersplit`: This mode assigns a token ID based on the combined
+  hash of the allocated type's name and the enclosing function's name, where
+  the top half ID-space is reserved for types that contain pointers and the bottom
+  half for types that do not contain pointers.
 - `random`: This mode assigns a statically-determined random token ID to each
   allocation site.
 - `increment`: This mode assigns a simple, incrementally increasing token ID

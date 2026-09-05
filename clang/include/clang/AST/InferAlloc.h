@@ -26,8 +26,11 @@ QualType inferPossibleType(const CallExpr *E, const ASTContext &Ctx,
                            const CastExpr *CastE);
 
 /// Get the information required for construction of an allocation token ID.
+/// If \p T is null, the returned type name is empty and ContainsPointer is
+/// false.
 std::optional<llvm::AllocTokenMetadata>
-getAllocTokenMetadata(QualType T, const ASTContext &Ctx);
+getAllocTokenMetadata(QualType T, const ASTContext &Ctx,
+                      const FunctionDecl *FD);
 
 } // namespace infer_alloc
 } // namespace clang
