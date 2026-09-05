@@ -1385,11 +1385,9 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
   Ops.push_back(ConstantAsMetadata::get(
       ConstantInt::get(Type::getInt1Ty(Ctx), MergedContainsPointer)));
 
-  if (FuncA || FuncB) {
-    StringRef FStrA = FuncA ? FuncA->getString() : "";
-    StringRef FStrB = FuncB ? FuncB->getString() : "";
-    Ops.push_back(MDString::get(Ctx, MergeStrings(FStrA, FStrB)));
-  }
+  if (FuncA && FuncB)
+    Ops.push_back(MDString::get(
+        Ctx, MergeStrings(FuncA->getString(), FuncB->getString())));
 
   return MDNode::get(Ctx, Ops);
 }

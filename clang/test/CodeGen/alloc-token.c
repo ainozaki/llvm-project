@@ -1,4 +1,6 @@
 // RUN: %clang_cc1 -fsanitize=alloc-token -triple x86_64-linux-gnu -emit-llvm -disable-llvm-passes %s -o - | FileCheck %s
+// RUN: %clang_cc1 -fsanitize=alloc-token -triple x86_64-linux-gnu -emit-llvm -disable-llvm-passes -falloc-token-mode=typefunchash %s -o - | FileCheck %s --check-prefix=TYPEFUNC
+// RUN: %clang_cc1 -fsanitize=alloc-token -triple x86_64-linux-gnu -emit-llvm -disable-llvm-passes -falloc-token-mode=typefunchashpointersplit %s -o - | FileCheck %s --check-prefix=TYPEFUNC
 
 typedef __typeof(sizeof(int)) size_t;
 
@@ -36,5 +38,15 @@ void test_malloc_like() {
   posix_memalign(&sink, 64, sizeof(int)); // FIXME: support posix_memalign
 }
 
+// CHECK-LABEL: define dso_local void @test_raw_malloc(
+// CHECK: call noalias ptr @malloc(i64 noundef %{{.*}})
+// CHECK-NOT: !alloc_token
+// TYPEFUNC-LABEL: define dso_local void @test_raw_malloc(
+// TYPEFUNC: call noalias ptr @malloc(i64 noundef %{{.*}}){{.*}} !alloc_token [[META_RAW:![0-9]+]]
+void test_raw_malloc(size_t size) {
+  sink = malloc(size);
+}
+
 // CHECK: [[META_INT]] = !{!"int", i1 false}
 // CHECK: [[META_LONG]] = !{!"long", i1 false}
+// TYPEFUNC: [[META_RAW]] = !{!"", i1 false, !"test_raw_malloc"}

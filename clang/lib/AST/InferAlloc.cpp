@@ -190,20 +190,23 @@ infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx,
                                    const FunctionDecl *FD) {
   llvm::AllocTokenMetadata ATMD;
 
-  // Get unique type name.
-  PrintingPolicy Policy(Ctx.getLangOpts());
-  Policy.SuppressTagKeyword = true;
-  Policy.FullyQualifiedName = true;
-  llvm::raw_svector_ostream TypeNameOS(ATMD.TypeName);
-  T.getCanonicalType().print(TypeNameOS, Policy);
+  ATMD.ContainsPointer = false;
+  if (!T.isNull()) {
+    // Get unique type name.
+    PrintingPolicy Policy(Ctx.getLangOpts());
+    Policy.SuppressTagKeyword = true;
+    Policy.FullyQualifiedName = true;
+    llvm::raw_svector_ostream TypeNameOS(ATMD.TypeName);
+    T.getCanonicalType().print(TypeNameOS, Policy);
 
-  // Check if QualType contains a pointer. Implements a simple DFS to
-  // recursively check if a type contains a pointer type.
-  llvm::SmallPtrSet<const RecordDecl *, 4> VisitedRD;
-  bool IncompleteType = false;
-  ATMD.ContainsPointer = typeContainsPointer(T, VisitedRD, IncompleteType);
-  if (!ATMD.ContainsPointer && IncompleteType)
-    return std::nullopt;
+    // Check if QualType contains a pointer. Implements a simple DFS to
+    // recursively check if a type contains a pointer type.
+    llvm::SmallPtrSet<const RecordDecl *, 4> VisitedRD;
+    bool IncompleteType = false;
+    ATMD.ContainsPointer = typeContainsPointer(T, VisitedRD, IncompleteType);
+    if (!ATMD.ContainsPointer && IncompleteType)
+      return std::nullopt;
+  }
 
   ATMD.FuncName.emplace();
   if (FD) {

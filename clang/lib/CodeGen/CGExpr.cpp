@@ -1363,10 +1363,10 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
     // Format: !{<type-name>, <contains-pointer>, <func-name>}
     return llvm::MDNode::get(CGM.getLLVMContext(),
                              {TypeNameMD, ContainsPtrMD, FuncNameMD});
+  } else {
+    // Format: !{<type-name>, <contains-pointer>}
+    return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
   }
-
-  // Format: !{<type-name>, <contains-pointer>}
-  return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
 }
 
 void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {
@@ -1378,8 +1378,16 @@ void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(const CallExpr *E) {
   QualType AllocType = infer_alloc::inferPossibleType(E, getContext(), CurCast);
-  if (!AllocType.isNull())
+  auto Mode =
+      getLangOpts().AllocTokenMode.value_or(llvm::DefaultAllocTokenMode);
+  if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
+      Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit) {
+    const auto *FD = dyn_cast_or_null<FunctionDecl>(CurFuncDecl);
+    if (!AllocType.isNull() || FD)
+      return buildAllocToken(AllocType);
+  } else if (!AllocType.isNull())
     return buildAllocToken(AllocType);
+
   return nullptr;
 }
 

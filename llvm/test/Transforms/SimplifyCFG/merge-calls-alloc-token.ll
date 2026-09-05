@@ -120,12 +120,62 @@ if.end:
   ret ptr %x.0
 }
 
+define ptr @test_merge_alloc_token_two_three(i1 %b) {
+; CHECK-LABEL: define ptr @test_merge_alloc_token_two_three(
+; CHECK-SAME: i1 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CALL:%.*]] = call ptr @_Znwm(i64 4), !alloc_token [[META3:![0-9]+]]
+; CHECK-NEXT:    ret ptr [[CALL]]
+;
+entry:
+  br i1 %b, label %if.then, label %if.else
+
+if.then:
+  %call = call ptr @_Znwm(i64 4), !alloc_token !4
+  br label %if.end
+
+if.else:
+  %call1 = call ptr @_Znwm(i64 4), !alloc_token !5
+  br label %if.end
+
+if.end:
+  %x.0 = phi ptr [ %call, %if.then ], [ %call1, %if.else ]
+  ret ptr %x.0
+}
+
+define ptr @test_merge_alloc_token_three_two(i1 %b) {
+; CHECK-LABEL: define ptr @test_merge_alloc_token_three_two(
+; CHECK-SAME: i1 [[B:%.*]]) {
+; CHECK-NEXT:  [[ENTRY:.*:]]
+; CHECK-NEXT:    [[CALL:%.*]] = call ptr @_Znwm(i64 4), !alloc_token [[META4:![0-9]+]]
+; CHECK-NEXT:    ret ptr [[CALL]]
+;
+entry:
+  br i1 %b, label %if.then, label %if.else
+
+if.then:
+  %call = call ptr @_Znwm(i64 4), !alloc_token !5
+  br label %if.end
+
+if.else:
+  %call1 = call ptr @_Znwm(i64 4), !alloc_token !4
+  br label %if.end
+
+if.end:
+  %x.0 = phi ptr [ %call, %if.then ], [ %call1, %if.else ]
+  ret ptr %x.0
+}
+
 !0 = !{!"int", i1 0}
 !1 = !{!"char[4]", i1 0}
 !2 = !{!"StructA", i1 1}
 !3 = !{!"StructB", i1 1}
+!4 = !{!"TwoOperandA", i1 0}
+!5 = !{!"ThreeOperandB", i1 1, !"funcB"}
 ;.
 ; CHECK: [[META0]] = !{!"int", i1 false}
 ; CHECK: [[META1]] = !{!"int|char[4]", i1 false}
 ; CHECK: [[META2]] = !{!"StructA|StructB", i1 true}
+; CHECK: [[META3]] = !{!"TwoOperandA|ThreeOperandB", i1 true}
+; CHECK: [[META4]] = !{!"ThreeOperandB|TwoOperandA", i1 true}
 ;.
