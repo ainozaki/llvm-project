@@ -102,12 +102,6 @@ STATISTIC(NumAllocationsInstrumented, "Allocations instrumented");
 
 //===----------------------------------------------------------------------===//
 
-bool containsPointer(const MDNode *MD) {
-  ConstantAsMetadata *C = cast<ConstantAsMetadata>(MD->getOperand(1));
-  auto *CI = cast<ConstantInt>(C->getValue());
-  return CI->getValue().getBoolValue();
-}
-
 /// Returns the allocation token metadata if available.
 ///
 /// Expected format is: !{<type-name>, <contains-pointer>[, <func-name>]}
@@ -133,10 +127,13 @@ std::optional<AllocTokenMetadata> getAllocTokenMetadata(const CallBase &CB) {
     assert(isa<MDString>(Ret->getOperand(2)));
 
   MDString *S = cast<MDString>(Ret->getOperand(0));
+  auto *ContainsPointer = cast<ConstantInt>(
+      cast<ConstantAsMetadata>(Ret->getOperand(1))->getValue());
   std::optional<SmallString<64>> FuncName;
   if (Ret->getNumOperands() >= 3)
     FuncName.emplace(cast<MDString>(Ret->getOperand(2))->getString());
-  return AllocTokenMetadata{S->getString(), containsPointer(Ret), FuncName};
+  return AllocTokenMetadata{
+      S->getString(), ContainsPointer->getValue().getBoolValue(), FuncName};
 }
 
 class ModeBase {
