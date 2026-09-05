@@ -182,25 +182,31 @@ private:
   std::unique_ptr<RandomNumberGenerator> RNG;
 };
 
-/// Implementation for TokenMode::TypeHash. The implementation ensures
-/// hashes are stable across different compiler invocations. Uses SipHash as the
-/// hash function.
-class TypeHashMode : public ModeBase {
+/// Implementation for the hash-based token modes. The implementation ensures
+/// hashes are stable across different compiler invocations.
+class HashMode : public ModeBase {
 public:
-  using ModeBase::ModeBase;
+  HashMode(const IntegerType &TokenTy, uint64_t MaxTokens, TokenMode Mode)
+      : ModeBase(TokenTy, MaxTokens), Mode(Mode) {
+    assert(Mode == TokenMode::TypeHash ||
+           Mode == TokenMode::TypeHashPointerSplit ||
+           Mode == TokenMode::TypeFuncHash ||
+           Mode == TokenMode::TypeFuncHashPointerSplit);
+  }
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-
-    if (auto Metadata = getAllocTokenMetadata(CB)) {
-      if (auto Token = getAllocToken(TokenMode::TypeHash, *Metadata, MaxTokens))
+    if (auto Metadata = getAllocTokenMetadata(CB))
+      if (auto Token = getAllocToken(Mode, *Metadata, MaxTokens))
         return *Token;
-    }
-    // Fallback.
+
+    // Pick the fallback token (ClFallbackToken), which by default is 0, meaning
+    // it'll fall into the pointer-less bucket. Override by setting
+    // -alloc-token-fallback if that is the wrong choice.
     remarkNoMetadata(CB, ORE);
     return ClFallbackToken;
   }
 
-protected:
+private:
   /// Remark that there was no precise type information.
   static void remarkNoMetadata(const CallBase &CB,
                                OptimizationRemarkEmitter &ORE) {
@@ -213,57 +219,8 @@ protected:
              << "' without source-level type token";
     });
   }
-};
 
-/// Implementation for TokenMode::TypeHashPointerSplit.
-class TypeHashPointerSplitMode : public TypeHashMode {
-public:
-  using TypeHashMode::TypeHashMode;
-
-  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (auto Metadata = getAllocTokenMetadata(CB)) {
-      if (auto Token = getAllocToken(TokenMode::TypeHashPointerSplit, *Metadata,
-                                     MaxTokens))
-        return *Token;
-    }
-    // Pick the fallback token (ClFallbackToken), which by default is 0, meaning
-    // it'll fall into the pointer-less bucket. Override by setting
-    // -alloc-token-fallback if that is the wrong choice.
-    remarkNoMetadata(CB, ORE);
-    return ClFallbackToken;
-  }
-};
-
-/// Implementation for TokenMode::TypeFuncHash.
-class TypeFuncHashMode : public TypeHashMode {
-public:
-  using TypeHashMode::TypeHashMode;
-
-  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (auto Metadata = getAllocTokenMetadata(CB)) {
-      if (auto Token =
-              getAllocToken(TokenMode::TypeFuncHash, *Metadata, MaxTokens))
-        return *Token;
-    }
-    remarkNoMetadata(CB, ORE);
-    return ClFallbackToken;
-  }
-};
-
-/// Implementation for TokenMode::TypeFuncHashPointerSplit.
-class TypeFuncHashPointerSplitMode : public TypeHashMode {
-public:
-  using TypeHashMode::TypeHashMode;
-
-  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (auto Metadata = getAllocTokenMetadata(CB)) {
-      if (auto Token = getAllocToken(TokenMode::TypeFuncHashPointerSplit,
-                                     *Metadata, MaxTokens))
-        return *Token;
-    }
-    remarkNoMetadata(CB, ORE);
-    return ClFallbackToken;
-  }
+  const TokenMode Mode;
 };
 
 // Apply opt overrides and module flags.
@@ -309,16 +266,10 @@ public:
                                M.createRNG(DEBUG_TYPE));
       break;
     case TokenMode::TypeHash:
-      Mode.emplace<TypeHashMode>(*IntPtrTy, Options.MaxTokens);
-      break;
     case TokenMode::TypeHashPointerSplit:
-      Mode.emplace<TypeHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
-      break;
     case TokenMode::TypeFuncHash:
-      Mode.emplace<TypeFuncHashMode>(*IntPtrTy, Options.MaxTokens);
-      break;
     case TokenMode::TypeFuncHashPointerSplit:
-      Mode.emplace<TypeFuncHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
+      Mode.emplace<HashMode>(*IntPtrTy, Options.MaxTokens, Options.Mode);
       break;
     }
   }
@@ -362,10 +313,7 @@ private:
   // Cache for replacement functions.
   DenseMap<std::pair<LibFunc, uint64_t>, FunctionCallee> TokenAllocFunctions;
   // Selected mode.
-  std::variant<IncrementMode, RandomMode, TypeHashMode,
-               TypeHashPointerSplitMode, TypeFuncHashMode,
-               TypeFuncHashPointerSplitMode>
-      Mode;
+  std::variant<IncrementMode, RandomMode, HashMode> Mode;
 };
 
 bool AllocToken::instrumentFunction(Function &F) {
