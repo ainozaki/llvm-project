@@ -1344,7 +1344,27 @@ void CodeGenFunction::EmitBoundsCheckImpl(const Expr *ArrayExpr,
 }
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, getContext());
+  auto Mode = getLangOpts().AllocTokenMode;
+  std::optional<const NamedDecl *> EnclosingFunction;
+  if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
+      Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit) {
+    const Decl *D = CurCodeDecl;
+    // Default arguments and member initializers may be emitted in a different
+    // function from the one in which they were written.
+    const Expr *DefaultExpr = CurSourceLocExprScope.getDefaultExpr();
+    if (const auto *DAE = dyn_cast_or_null<CXXDefaultArgExpr>(DefaultExpr))
+      D = DAE->getParam();
+    else if (const auto *DIE =
+                 dyn_cast_or_null<CXXDefaultInitExpr>(DefaultExpr))
+      D = DIE->getField();
+
+    while (D && !isa<FunctionDecl, ObjCMethodDecl>(D))
+      D = cast_or_null<Decl>(D->getDeclContext());
+    EnclosingFunction = cast_or_null<NamedDecl>(D);
+  }
+
+  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, getContext(),
+                                                 EnclosingFunction);
   if (!ATMD)
     return nullptr;
 
@@ -1353,8 +1373,12 @@ llvm::MDNode *CodeGenFunction::buildAllocToken(QualType AllocType) {
   auto *ContainsPtrC = Builder.getInt1(ATMD->ContainsPointer);
   auto *ContainsPtrMD = MDB.createConstant(ContainsPtrC);
 
-  // Format: !{<type-name>, <contains-pointer>}
-  return llvm::MDNode::get(CGM.getLLVMContext(), {TypeNameMD, ContainsPtrMD});
+  llvm::SmallVector<llvm::Metadata *, 3> Ops = {TypeNameMD, ContainsPtrMD};
+  if (ATMD->FunctionName)
+    Ops.push_back(MDB.createString(*ATMD->FunctionName));
+
+  // Format: !{<type-name>, <contains-pointer>[, <function-name>]}
+  return llvm::MDNode::get(CGM.getLLVMContext(), Ops);
 }
 
 void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {
@@ -1366,9 +1390,7 @@ void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, QualType AllocType) {
 
 llvm::MDNode *CodeGenFunction::buildAllocToken(const CallExpr *E) {
   QualType AllocType = infer_alloc::inferPossibleType(E, getContext(), CurCast);
-  if (!AllocType.isNull())
-    return buildAllocToken(AllocType);
-  return nullptr;
+  return buildAllocToken(AllocType);
 }
 
 void CodeGenFunction::EmitAllocToken(llvm::CallBase *CB, const CallExpr *E) {

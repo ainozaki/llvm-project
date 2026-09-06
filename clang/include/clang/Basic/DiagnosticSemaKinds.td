@@ -11601,6 +11601,8 @@ def err_x86_builtin_tile_arg_duplicate : Error<
 
 def err_builtin_target_unsupported : Error<
   "builtin is not supported on this target">;
+def err_alloc_token_builtin_unsupported_mode : Error<
+  "__builtin_infer_alloc_token is not yet supported with allocation token mode '%0'">;
 def err_builtin_aix_os_unsupported : Error<
   "this builtin is available only on AIX 7.2 and later operating systems">;
 def err_builtin_longjmp_unsupported : Error<

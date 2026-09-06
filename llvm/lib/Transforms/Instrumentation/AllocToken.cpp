@@ -104,7 +104,7 @@ STATISTIC(NumAllocationsInstrumented, "Allocations instrumented");
 
 /// Returns the !alloc_token metadata if available.
 ///
-/// Expected format is: !{<type-name>, <contains-pointer>}
+/// Expected format is: !{<type-name>, <contains-pointer>[, <function-name>]}
 MDNode *getAllocTokenMetadata(const CallBase &CB) {
   MDNode *Ret = nullptr;
   if (auto *II = dyn_cast<IntrinsicInst>(&CB);
@@ -119,9 +119,12 @@ MDNode *getAllocTokenMetadata(const CallBase &CB) {
     if (!Ret)
       return nullptr;
   }
-  assert(Ret->getNumOperands() == 2 && "bad !alloc_token");
+  assert((Ret->getNumOperands() == 2 || Ret->getNumOperands() == 3) &&
+         "bad !alloc_token");
   assert(isa<MDString>(Ret->getOperand(0)));
   assert(isa<ConstantAsMetadata>(Ret->getOperand(1)));
+  assert((Ret->getNumOperands() == 2 || isa<MDString>(Ret->getOperand(2))) &&
+         "bad !alloc_token function name");
   return Ret;
 }
 
@@ -174,19 +177,22 @@ private:
   std::unique_ptr<RandomNumberGenerator> RNG;
 };
 
-/// Implementation for TokenMode::TypeHash. The implementation ensures
+/// Implementation for the stateless hash modes. The implementation ensures
 /// hashes are stable across different compiler invocations. Uses SipHash as the
 /// hash function.
 class TypeHashMode : public ModeBase {
 public:
-  using ModeBase::ModeBase;
+  TypeHashMode(const IntegerType &TokenTy, uint64_t MaxTokens, TokenMode Mode)
+      : ModeBase(TokenTy, MaxTokens), Mode(Mode) {}
 
   uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
 
     if (MDNode *N = getAllocTokenMetadata(CB)) {
       MDString *S = cast<MDString>(N->getOperand(0));
       AllocTokenMetadata Metadata{S->getString(), containsPointer(N)};
-      if (auto Token = getAllocToken(TokenMode::TypeHash, Metadata, MaxTokens))
+      if (N->getNumOperands() == 3)
+        Metadata.FunctionName = cast<MDString>(N->getOperand(2))->getString();
+      if (auto Token = getAllocToken(Mode, Metadata, MaxTokens))
         return *Token;
     }
     // Fallback.
@@ -194,7 +200,9 @@ public:
     return ClFallbackToken;
   }
 
-protected:
+private:
+  TokenMode Mode;
+
   /// Remark that there was no precise type information.
   static void remarkNoMetadata(const CallBase &CB,
                                OptimizationRemarkEmitter &ORE) {
@@ -206,27 +214,6 @@ protected:
              << "Call to '" << CalleeNV << "' in '" << FuncNV
              << "' without source-level type token";
     });
-  }
-};
-
-/// Implementation for TokenMode::TypeHashPointerSplit.
-class TypeHashPointerSplitMode : public TypeHashMode {
-public:
-  using TypeHashMode::TypeHashMode;
-
-  uint64_t operator()(const CallBase &CB, OptimizationRemarkEmitter &ORE) {
-    if (MDNode *N = getAllocTokenMetadata(CB)) {
-      MDString *S = cast<MDString>(N->getOperand(0));
-      AllocTokenMetadata Metadata{S->getString(), containsPointer(N)};
-      if (auto Token = getAllocToken(TokenMode::TypeHashPointerSplit, Metadata,
-                                     MaxTokens))
-        return *Token;
-    }
-    // Pick the fallback token (ClFallbackToken), which by default is 0, meaning
-    // it'll fall into the pointer-less bucket. Override by setting
-    // -alloc-token-fallback if that is the wrong choice.
-    remarkNoMetadata(CB, ORE);
-    return ClFallbackToken;
   }
 };
 
@@ -273,10 +260,10 @@ public:
                                M.createRNG(DEBUG_TYPE));
       break;
     case TokenMode::TypeHash:
-      Mode.emplace<TypeHashMode>(*IntPtrTy, Options.MaxTokens);
-      break;
     case TokenMode::TypeHashPointerSplit:
-      Mode.emplace<TypeHashPointerSplitMode>(*IntPtrTy, Options.MaxTokens);
+    case TokenMode::TypeFuncHash:
+    case TokenMode::TypeFuncHashPointerSplit:
+      Mode.emplace<TypeHashMode>(*IntPtrTy, Options.MaxTokens, Options.Mode);
       break;
     }
   }
@@ -320,9 +307,7 @@ private:
   // Cache for replacement functions.
   DenseMap<std::pair<LibFunc, uint64_t>, FunctionCallee> TokenAllocFunctions;
   // Selected mode.
-  std::variant<IncrementMode, RandomMode, TypeHashMode,
-               TypeHashPointerSplitMode>
-      Mode;
+  std::variant<IncrementMode, RandomMode, TypeHashMode> Mode;
 };
 
 bool AllocToken::instrumentFunction(Function &F) {

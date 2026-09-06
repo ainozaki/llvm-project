@@ -1341,7 +1341,8 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
     return nullptr;
   if (A == B)
     return const_cast<MDNode *>(A);
-  if (A->getNumOperands() != 2 || B->getNumOperands() != 2)
+  if ((A->getNumOperands() != 2 && A->getNumOperands() != 3) ||
+      (B->getNumOperands() != 2 && B->getNumOperands() != 3))
     return nullptr;
   auto *CIA = mdconst::dyn_extract_or_null<ConstantInt>(A->getOperand(1));
   auto *CIB = mdconst::dyn_extract_or_null<ConstantInt>(B->getOperand(1));
@@ -1353,23 +1354,30 @@ MDNode *MDNode::getMergedAllocTokenMetadata(const MDNode *A, const MDNode *B) {
   if (!NameA || !NameB)
     return nullptr;
 
-  if (NameA == NameB)
-    return CIA->isOne() ? const_cast<MDNode *>(A) : const_cast<MDNode *>(B);
-
   LLVMContext &Ctx = A->getContext();
-  StringRef StrA = NameA->getString();
-  StringRef StrB = NameB->getString();
-
-  SmallString<64> Buffer;
-  Buffer.reserve(StrA.size() + 1 + StrB.size());
-  Buffer.append(StrA);
-  Buffer.push_back('|');
-  Buffer.append(StrB);
+  auto MergeNames = [&](MDString *LHS, MDString *RHS) {
+    if (LHS == RHS)
+      return LHS;
+    SmallString<64> Buffer(LHS->getString());
+    Buffer.push_back('|');
+    Buffer.append(RHS->getString());
+    return MDString::get(Ctx, Buffer);
+  };
 
   bool MergedContainsPointer = CIA->isOne() || CIB->isOne();
-  Metadata *Ops[] = {MDString::get(Ctx, Buffer),
-                     ConstantAsMetadata::get(ConstantInt::get(
-                         Type::getInt1Ty(Ctx), MergedContainsPointer))};
+  SmallVector<Metadata *, 3> Ops = {
+      MergeNames(NameA, NameB),
+      ConstantAsMetadata::get(
+          ConstantInt::get(Type::getInt1Ty(Ctx), MergedContainsPointer))};
+  // Keep the function name only if both allocations carry one. Otherwise the
+  // function-sensitive modes must use their fallback token.
+  if (A->getNumOperands() == 3 && B->getNumOperands() == 3) {
+    auto *FuncA = dyn_cast_or_null<MDString>(A->getOperand(2));
+    auto *FuncB = dyn_cast_or_null<MDString>(B->getOperand(2));
+    if (!FuncA || !FuncB)
+      return nullptr;
+    Ops.push_back(MergeNames(FuncA, FuncB));
+  }
   return MDNode::get(Ctx, Ops);
 }
 

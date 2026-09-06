@@ -185,9 +185,23 @@ QualType infer_alloc::inferPossibleType(const CallExpr *E,
   return AllocType;
 }
 
-std::optional<llvm::AllocTokenMetadata>
-infer_alloc::getAllocTokenMetadata(QualType T, const ASTContext &Ctx) {
+std::optional<llvm::AllocTokenMetadata> infer_alloc::getAllocTokenMetadata(
+    QualType T, const ASTContext &Ctx,
+    std::optional<const NamedDecl *> EnclosingFunction) {
   llvm::AllocTokenMetadata ATMD;
+  if (EnclosingFunction)
+    ATMD.FunctionName = *EnclosingFunction
+                            ? (*EnclosingFunction)->getQualifiedNameAsString()
+                            : "";
+
+  if (T.isNull()) {
+    if (!EnclosingFunction)
+      return std::nullopt;
+    // Preserve the function even when the allocation type cannot be inferred.
+    // Unknown types use the non-pointer range in TypeFuncHashPointerSplit.
+    ATMD.ContainsPointer = false;
+    return ATMD;
+  }
 
   // Get unique type name.
   PrintingPolicy Policy(Ctx.getLangOpts());

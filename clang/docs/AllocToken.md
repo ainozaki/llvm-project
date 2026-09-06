@@ -37,10 +37,17 @@ change or removal. These may (experimentally) be selected with `-Xclang
 
 - `typehash`: This mode assigns a token ID based on the hash of the allocated
   type's name.
+- `typefunchash`: This mode assigns a token ID based on the combined hash of
+  the allocated type's name and the enclosing function's name.
+- `typefunchashpointersplit`: This mode assigns a token ID same as `typefunchash` with the pointer/non-pointer
+  range separation as `typehashpointersplit`.
 - `random`: This mode assigns a statically-determined random token ID to each
   allocation site.
 - `increment`: This mode assigns a simple, incrementally increasing token ID
   to each allocation site.
+
+If type inference fails, both function-sensitive modes use an empty type name;
+`typefunchashpointersplit` assigns the token to the non-pointer range.
 
 The following command-line options affect generated token IDs:
 
@@ -73,6 +80,8 @@ void foo(void) {
     MyType *x = partition_alloc(sizeof(*x));
 }
 ```
+`__builtin_infer_alloc_token` is not yet supported with `typefunchash` or
+`typefunchashpointersplit`. Using this combination is diagnosed as an error.
 
 ## Allocation Token Instrumentation
 

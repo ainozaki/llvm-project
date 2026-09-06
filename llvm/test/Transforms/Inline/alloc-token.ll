@@ -31,7 +31,17 @@ define ptr @no_overwrite() {
   ret ptr %c
 }
 
+; All three operands are inherited when the inner allocation has no metadata.
+; CHECK-LABEL: define ptr @inherits_function(
+; CHECK: call ptr @malloc(i64 4){{.*}}, !alloc_token [[FUNC:![0-9]+]]
+define ptr @inherits_function() {
+  %p = call ptr @wrapper(i64 4), !alloc_token !2
+  ret ptr %p
+}
+
 ; CHECK-DAG: [[MD]] = !{!"Outer", i1 true}
 ; CHECK-DAG: [[OWN]] = !{!"Inner", i1 false}
+; CHECK-DAG: [[FUNC]] = !{!"int", i1 false, !"ns::foo"}
 !0 = !{!"Outer", i1 true}
 !1 = !{!"Inner", i1 false}
+!2 = !{!"int", i1 false, !"ns::foo"}

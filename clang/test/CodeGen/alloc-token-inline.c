@@ -1,5 +1,6 @@
 // RUN: %clang_cc1 -O -fsanitize=alloc-token -fsanitize-alloc-token-extended -triple x86_64-linux-gnu -emit-llvm %s -o - | FileCheck %s --implicit-check-not=__alloc_token
 // RUN: %clang_cc1 -O -fsanitize=alloc-token -triple x86_64-linux-gnu -emit-llvm %s -o - | FileCheck %s --implicit-check-not=__alloc_token
+// RUN: %clang_cc1 -O -fsanitize=alloc-token -falloc-token-mode=typefunchash -falloc-token-max=1000 -triple x86_64-linux-gnu -emit-llvm %s -o - | FileCheck %s --check-prefix=FUNCHASH
 
 typedef __typeof(sizeof(int)) size_t;
 
@@ -22,6 +23,12 @@ __attribute__((malloc, always_inline)) inline void *wrapper(size_t size) {
 void test_inlined_wrapper(void) {
   sink = wrapper(sizeof(int));
 }
+
+// An unknown type still has metadata in TypeFuncHash mode. The inliner retains
+// the inner allocation's function name, so its hash input remains ":wrapper".
+// FUNCHASH-LABEL: @test_inlined_wrapper(
+// FUNCHASH: call{{.*}} @__alloc_token_malloc(i64 noundef 4, i64 864){{.*}} !alloc_token [[UNKNOWN:![0-9]+]]
+// FUNCHASH: [[UNKNOWN]] = !{!"", i1 false, !"wrapper"}
 
 // CHECK: declare{{.*}} @__alloc_token_malloc(
 // CHECK: [[META_INT]] = !{!"int", i1 false}
