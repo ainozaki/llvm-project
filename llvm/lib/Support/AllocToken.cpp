@@ -13,6 +13,7 @@
 #include "llvm/Support/AllocToken.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/SipHash.h"
 
 using namespace llvm;
@@ -54,18 +55,6 @@ std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
                                             uint64_t MaxTokens) {
   assert(MaxTokens && "Must provide non-zero max tokens");
 
-  StringRef Name = Metadata.TypeName;
-  SmallString<128> TypeAndFunctionName;
-  if (Mode == AllocTokenMode::TypeFuncHash ||
-      Mode == AllocTokenMode::TypeFuncHashPointerSplit) {
-    if (!Metadata.FunctionName)
-      return std::nullopt;
-    TypeAndFunctionName = Name;
-    TypeAndFunctionName.push_back(':');
-    TypeAndFunctionName.append(*Metadata.FunctionName);
-    Name = TypeAndFunctionName;
-  }
-
   switch (Mode) {
   case AllocTokenMode::Increment:
   case AllocTokenMode::Random:
@@ -73,20 +62,60 @@ std::optional<uint64_t> llvm::getAllocToken(AllocTokenMode Mode,
     return std::nullopt;
 
   case AllocTokenMode::TypeHash:
-  case AllocTokenMode::TypeFuncHash:
-    return getStableSipHash(Name) % MaxTokens;
+    return getStableSipHash(Metadata.TypeName) % MaxTokens;
 
-  case AllocTokenMode::TypeHashPointerSplit:
-  case AllocTokenMode::TypeFuncHashPointerSplit: {
+  case AllocTokenMode::TypeHashPointerSplit: {
     if (MaxTokens == 1)
       return 0;
     const uint64_t HalfTokens = MaxTokens / 2;
-    uint64_t Hash = getStableSipHash(Name) % HalfTokens;
+    uint64_t Hash = getStableSipHash(Metadata.TypeName) % HalfTokens;
     if (Metadata.ContainsPointer)
       Hash += HalfTokens;
     return Hash;
   }
+
+  case AllocTokenMode::TypeFuncHash:
+  case AllocTokenMode::TypeFuncHashPointerSplit: {
+    if (!Metadata.FunctionName)
+      return std::nullopt;
+
+    if (MaxTokens < 8)
+      return std::nullopt;
+
+    unsigned MaxBits;
+    if (MaxTokens == UINT64_MAX)
+      MaxBits = 64;
+    else if (MaxTokens == 0xFFFFFFFFULL)
+      MaxBits = 32;
+    else
+      MaxBits = llvm::Log2_64(MaxTokens);
+
+    if (MaxBits < 3)
+      return std::nullopt;
+
+    uint64_t TypeHash =
+        Metadata.TypeName.empty() ? 0 : getStableSipHash(Metadata.TypeName);
+    uint64_t FuncHash = getStableSipHash(*Metadata.FunctionName);
+
+    unsigned FuncBits = MaxBits / 2;
+    uint64_t FuncVal =
+        (FuncBits == 64) ? FuncHash : (FuncHash % (1ULL << FuncBits));
+
+    if (Mode == AllocTokenMode::TypeFuncHashPointerSplit) {
+      unsigned TypeBits = (MaxBits - 1) - FuncBits;
+      uint64_t TypeVal =
+          (TypeBits == 64) ? TypeHash : (TypeHash % (1ULL << TypeBits));
+      uint64_t PointerVal =
+          Metadata.ContainsPointer ? (1ULL << (MaxBits - 1)) : 0;
+      return PointerVal | (TypeVal << FuncBits) | FuncVal;
+    }
+
+    unsigned TypeBits = MaxBits - FuncBits;
+    uint64_t TypeVal =
+        (TypeBits == 64) ? TypeHash : (TypeHash % (1ULL << TypeBits));
+    return (TypeVal << FuncBits) | FuncVal;
+  }
   }
 
-  llvm_unreachable("");
+  llvm_unreachable("Unknown AllocTokenMode");
 }

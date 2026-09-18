@@ -1642,13 +1642,6 @@ static void builtinAllocaAddrSpace(Sema &S, CallExpr *TheCall) {
 }
 
 static bool checkBuiltinInferAllocToken(Sema &S, CallExpr *TheCall) {
-  auto Mode = S.getLangOpts().AllocTokenMode;
-  if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
-      Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit)
-    return S.Diag(TheCall->getExprLoc(),
-                  diag::err_alloc_token_builtin_unsupported_mode)
-           << llvm::getAllocTokenModeAsString(*Mode);
-
   if (S.checkArgCountAtLeast(TheCall, 1))
     return true;
 

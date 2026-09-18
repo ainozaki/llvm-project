@@ -3424,7 +3424,7 @@ public:
                              SanitizerHandler Handler);
 
   /// Build metadata used by the AllocToken instrumentation.
-  llvm::MDNode *buildAllocToken(QualType AllocType);
+  llvm::MDNode *buildAllocToken(QualType AllocType, bool IsBuiltin = false);
   /// Emit and set additional metadata used by the AllocToken instrumentation.
   void EmitAllocToken(llvm::CallBase *CB, QualType AllocType);
   /// Build additional metadata used by the AllocToken instrumentation,

@@ -24,11 +24,10 @@ void test_inlined_wrapper(void) {
   sink = wrapper(sizeof(int));
 }
 
-// An unknown type still has metadata in TypeFuncHash mode. The inliner retains
-// the inner allocation's function name, so its hash input remains ":wrapper".
+// Inlining propagates call-site metadata to the inlined allocation.
 // FUNCHASH-LABEL: @test_inlined_wrapper(
-// FUNCHASH: call{{.*}} @__alloc_token_malloc(i64 noundef 4, i64 864){{.*}} !alloc_token [[UNKNOWN:![0-9]+]]
-// FUNCHASH: [[UNKNOWN]] = !{!"", i1 false, !"wrapper"}
+// FUNCHASH: call{{.*}} @__alloc_token_malloc(i64 noundef 4, i64 303){{.*}} !alloc_token [[META_INT:![0-9]+]]
+// FUNCHASH: [[META_INT]] = !{!"int", i1 false, !"test_inlined_wrapper"}
 
 // CHECK: declare{{.*}} @__alloc_token_malloc(
 // CHECK: [[META_INT]] = !{!"int", i1 false}

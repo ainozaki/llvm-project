@@ -215,8 +215,14 @@ std::optional<llvm::AllocTokenMetadata> infer_alloc::getAllocTokenMetadata(
   llvm::SmallPtrSet<const RecordDecl *, 4> VisitedRD;
   bool IncompleteType = false;
   ATMD.ContainsPointer = typeContainsPointer(T, VisitedRD, IncompleteType);
-  if (!ATMD.ContainsPointer && IncompleteType)
-    return std::nullopt;
+  if (!ATMD.ContainsPointer && IncompleteType) {
+    if (!EnclosingFunction)
+      return std::nullopt;
+    // If pointer presence is unknown, drop the type name and preserve the function.
+    ATMD.TypeName.clear();
+    ATMD.ContainsPointer = false;
+    return ATMD;
+  }
 
   return ATMD;
 }

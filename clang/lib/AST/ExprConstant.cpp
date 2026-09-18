@@ -17327,11 +17327,16 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
     if (AllocType.isNull())
       return Error(
           E, diag::note_constexpr_infer_alloc_token_type_inference_failed);
-    auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, Info.Ctx);
-    if (!ATMD)
-      return Error(E, diag::note_constexpr_infer_alloc_token_no_metadata);
     auto Mode =
         Info.getLangOpts().AllocTokenMode.value_or(llvm::DefaultAllocTokenMode);
+    std::optional<const NamedDecl *> EnclosingFunction;
+    if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
+        Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit)
+      EnclosingFunction = (const NamedDecl *)nullptr;
+    auto ATMD =
+        infer_alloc::getAllocTokenMetadata(AllocType, Info.Ctx, EnclosingFunction);
+    if (!ATMD)
+      return Error(E, diag::note_constexpr_infer_alloc_token_no_metadata);
     uint64_t BitWidth = Info.Ctx.getTypeSize(Info.Ctx.getSizeType());
     auto MaxTokensOpt = Info.getLangOpts().AllocTokenMax;
     uint64_t MaxTokens =

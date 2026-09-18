@@ -12,7 +12,7 @@ namespace ns {
 // MD: call {{.*}} @_Znwm({{.*}}){{.*}}, !alloc_token [[FOO]]
 // MD: call {{.*}} @_Znam({{.*}}){{.*}}, !alloc_token [[FOO]]
 // LOWER-LABEL: define {{.*}} @_ZN2ns3fooEv(
-// LOWER: @__alloc_token_malloc({{.*}}i64 -7809983928432415842)
+// LOWER: @__alloc_token_malloc({{.*}}i64 6086435479774235724)
 void foo() {
   sink = malloc(sizeof(int));
   sink = new int;
@@ -35,7 +35,7 @@ void pointer() { sink = new int *; }
 
 // Generated global initialization function names are not part of the token.
 // MD: call {{.*}} @_Znwm({{.*}}){{.*}}, !alloc_token [[GLOBAL:![0-9]+]]
-// LOWER: @__alloc_token__Znwm({{.*}}i64 -6646512383795279905)
+// LOWER: @__alloc_token__Znwm({{.*}}i64 6086435478597976305)
 int *global = new int;
 
 template<class T> struct Box {

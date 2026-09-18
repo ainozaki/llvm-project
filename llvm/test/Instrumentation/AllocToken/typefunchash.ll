@@ -1,6 +1,6 @@
-; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typefunchash>' -alloc-token-max=5 -alloc-token-fallback=7 -S | FileCheck %s --check-prefixes=CHECK,HASH
-; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typefunchashpointersplit>' -alloc-token-max=5 -alloc-token-fallback=7 -S | FileCheck %s --check-prefixes=CHECK,SPLIT
-; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typefunchashpointersplit>' -alloc-token-max=1 -alloc-token-fallback=7 -S | FileCheck %s --check-prefixes=CHECK,ONE
+; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typefunchash>' -alloc-token-max=16 -alloc-token-fallback=7 -S | FileCheck %s --check-prefixes=CHECK,HASH
+; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typefunchashpointersplit>' -alloc-token-max=16 -alloc-token-fallback=7 -S | FileCheck %s --check-prefixes=CHECK,SPLIT
+; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typefunchashpointersplit>' -alloc-token-max=5 -alloc-token-fallback=7 -S | FileCheck %s --check-prefix=SMALL
 ; RUN: opt < %s -passes='inferattrs,alloc-token<mode=typehash>' -S | FileCheck %s --check-prefix=LEGACY
 
 target datalayout = "e-p:64:64"
@@ -10,15 +10,15 @@ declare ptr @malloc(i64)
 ; calls differ only in function name; the third differs only in the pointer flag.
 ; An empty function name is valid, while legacy or absent metadata falls back.
 ; CHECK-LABEL: define void @test(
-; HASH: call ptr @__alloc_token_malloc(i64 4, i64 4)
-; HASH: call ptr @__alloc_token_malloc(i64 4, i64 0)
-; HASH: call ptr @__alloc_token_malloc(i64 4, i64 4)
-; HASH: call ptr @__alloc_token_malloc(i64 4, i64 1)
+; HASH: call ptr @__alloc_token_malloc(i64 4, i64 8)
+; HASH: call ptr @__alloc_token_malloc(i64 4, i64 9)
+; HASH: call ptr @__alloc_token_malloc(i64 4, i64 8)
+; HASH: call ptr @__alloc_token_malloc(i64 4, i64 9)
 ; SPLIT: call ptr @__alloc_token_malloc(i64 4, i64 0)
 ; SPLIT: call ptr @__alloc_token_malloc(i64 4, i64 1)
-; SPLIT: call ptr @__alloc_token_malloc(i64 4, i64 2)
+; SPLIT: call ptr @__alloc_token_malloc(i64 4, i64 8)
 ; SPLIT: call ptr @__alloc_token_malloc(i64 4, i64 1)
-; ONE-COUNT-4: call ptr @__alloc_token_malloc(i64 4, i64 0)
+; SMALL-COUNT-6: call ptr @__alloc_token_malloc(i64 4, i64 7)
 ; CHECK-COUNT-2: call ptr @__alloc_token_malloc(i64 4, i64 7)
 ; LEGACY-LABEL: define void @test(
 ; LEGACY-COUNT-5: call ptr @__alloc_token_malloc(i64 4, i64 2689373973731826898)

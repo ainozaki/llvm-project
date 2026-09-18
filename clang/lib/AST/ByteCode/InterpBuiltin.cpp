@@ -1546,7 +1546,12 @@ static bool interp__builtin_infer_alloc_token(InterpState &S, CodePtr OpPC,
     return false;
   }
 
-  auto ATMD = infer_alloc::getAllocTokenMetadata(AllocType, ASTCtx);
+  std::optional<const NamedDecl *> EnclosingFunction;
+  if (Mode == llvm::AllocTokenMode::TypeFuncHash ||
+      Mode == llvm::AllocTokenMode::TypeFuncHashPointerSplit)
+    EnclosingFunction = (const NamedDecl *)nullptr;
+  auto ATMD =
+      infer_alloc::getAllocTokenMetadata(AllocType, ASTCtx, EnclosingFunction);
   if (!ATMD) {
     S.CCEDiag(Call, diag::note_constexpr_infer_alloc_token_no_metadata);
     return false;

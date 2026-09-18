@@ -984,10 +984,13 @@ propagateAllocTokenMetadata(Function *CalledFunc, CallBase &CB,
     // Skip calls simplified during inlining; propagation may be incorrect.
     if (InlinedFunctionInfo.isSimplified(OrigCall, ClonedCall))
       continue;
-    // Fill missing only: never overwrite a more specific token the wrapper
-    // already set on an internal allocation.
-    if (ClonedCall->getMetadata(LLVMContext::MD_alloc_token))
-      continue;
+    // Never overwrite a more specific token already set on an internal
+    // allocation, unless its type name is empty.
+    if (MDNode *Existing = ClonedCall->getMetadata(LLVMContext::MD_alloc_token)) {
+      if (auto *TypeName = dyn_cast<MDString>(Existing->getOperand(0)))
+        if (!TypeName->getString().empty())
+          continue;
+    }
     ClonedCall->setMetadata(LLVMContext::MD_alloc_token, AllocTokenMD);
   }
 }

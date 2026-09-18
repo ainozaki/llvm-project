@@ -39,9 +39,23 @@ define ptr @inherits_function() {
   ret ptr %p
 }
 
+define internal ptr @wrapper_empty_type(i64 %size) alwaysinline {
+  %p = call ptr @malloc(i64 %size), !alloc_token !3
+  ret ptr %p
+}
+
+; Metadata with an empty type name is overwritten.
+; CHECK-LABEL: define ptr @overwrites_empty_type(
+; CHECK: call ptr @malloc(i64 4){{.*}}, !alloc_token [[FUNC]]
+define ptr @overwrites_empty_type() {
+  %p = call ptr @wrapper_empty_type(i64 4), !alloc_token !2
+  ret ptr %p
+}
+
 ; CHECK-DAG: [[MD]] = !{!"Outer", i1 true}
 ; CHECK-DAG: [[OWN]] = !{!"Inner", i1 false}
 ; CHECK-DAG: [[FUNC]] = !{!"int", i1 false, !"ns::foo"}
 !0 = !{!"Outer", i1 true}
 !1 = !{!"Inner", i1 false}
 !2 = !{!"int", i1 false, !"ns::foo"}
+!3 = !{!"", i1 false, !"wrapper"}

@@ -80,8 +80,9 @@ void foo(void) {
     MyType *x = partition_alloc(sizeof(*x));
 }
 ```
-`__builtin_infer_alloc_token` is not yet supported with `typefunchash` or
-`typefunchashpointersplit`. Using this combination is diagnosed as an error.
+In `typefunchash` and `typefunchashpointersplit` modes, `__builtin_infer_alloc_token`
+computes tokens using an empty function name (`""`). Builtin tokens can be
+compared against each other, and the pointer flag is preserved.
 
 ## Allocation Token Instrumentation
 
